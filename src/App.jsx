@@ -9,6 +9,8 @@ import Jobs from "./pages/Jobs";
 import ProtectedRoute from "./router/ProtectedRoute";
 import MobileBlockPage from "./utility/MobileBlockPage";
 import Login from "./pages/Login";
+import OrgSetup from "./components/Company/orgsetup";
+
 
 import ContactPage from "./pages/ContactPage";
 
@@ -24,6 +26,7 @@ function App() {
       {/* login */}
       {/* <Route path="/login" element={<Login />} /> */}
       <Route index element={<Login />} />
+      <Route path="/orgsetup" element={<OrgSetup />} />
       <Route
         path="/"
         element={
