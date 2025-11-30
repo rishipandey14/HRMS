@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 
+// initial data
 const initialMembers = [
   { name: "Mohan Kumar", email: "mohan@taskfleet.com", img: 1, role: "Admin", phone: "+91 62681 85883", joined: "12-02-2025" },
   { name: "Thor Odinson", email: "thor@ddrussell.com", img: 2, role: "Employee", phone: "+91 98765 43210", joined: "21-01-2025" },
@@ -9,23 +10,31 @@ const initialMembers = [
 
 const isAdmin = true;
 
-const Nember = () => {
+export default function Nember() {
   const [members, setMembers] = useState(initialMembers);
-  const [openMenuIndex, setOpenMenuIndex] = useState(null);
+  const [openMenuIndex, setOpenMenuIndex] = useState(null); // index of open menu or null
   const [openEditModal, setOpenEditModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  const menuRef = useRef(null);
 
-  // Close dropdown when clicking outside
+  // close dropdown when click outside current menu/button
   useEffect(() => {
-    const closeDropdown = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setOpenMenuIndex(null);
+    const onDocClick = (e) => {
+      if (openMenuIndex === null) return;
+
+      // If clicked inside the open dropdown or its button, do nothing
+      const insideDropdown = e.target.closest(`[data-dropdown-index="${openMenuIndex}"]`);
+      const insideButton = e.target.closest(`[data-menu-button-index="${openMenuIndex}"]`);
+
+      if (insideDropdown || insideButton) {
+        return;
       }
+      // otherwise close
+      setOpenMenuIndex(null);
     };
-    document.addEventListener("mousedown", closeDropdown);
-    return () => document.removeEventListener("mousedown", closeDropdown);
-  }, []);
+
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [openMenuIndex]);
 
   const openEdit = (member) => {
     setSelectedMember(member);
@@ -33,22 +42,24 @@ const Nember = () => {
     setOpenMenuIndex(null);
   };
 
-  // ✅ DELETE MEMBER
   const deleteMember = (email) => {
     setMembers((prev) => prev.filter((m) => m.email !== email));
     setOpenMenuIndex(null);
+    if (selectedMember?.email === email) {
+      setOpenEditModal(false);
+      setSelectedMember(null);
+    }
   };
 
   return (
     <>
-      {/* ---------- MAIN MEMBER GRID ---------- */}
       <div className="bg-gray-100 flex flex-col rounded-2xl p-6">
         <h2 className="text-xl font-semibold p-4">Team Members</h2>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {members.map((member, index) => (
             <div
-              key={index}
+              key={member.email}
               className="bg-white rounded-2xl text-center py-11 pb-0 relative flex flex-col items-center justify-between gap-2 h-72"
             >
               <img
@@ -64,21 +75,27 @@ const Nember = () => {
                 View Profile
               </button>
 
-              {/* ADMIN MENU BUTTON */}
               {isAdmin && (
-                <div ref={menuRef} className="absolute top-2 right-2">
+                <div className="absolute top-2 right-2">
+                  {/* menu button has data attribute with index */}
                   <button
-                    onClick={() =>
-                      setOpenMenuIndex(openMenuIndex === index ? null : index)
-                    }
+                    onClick={(ev) => {
+                      // toggle this index
+                      setOpenMenuIndex((cur) => (cur === index ? null : index));
+                    }}
+                    data-menu-button-index={index}
                     className="text-gray-400 hover:text-gray-500"
+                    aria-label="open menu"
                   >
                     •••
                   </button>
 
-                  {/* DROPDOWN MENU */}
+                  {/* Dropdown: mark with data-dropdown-index */}
                   {openMenuIndex === index && (
-                    <div className="absolute right-0 mt-3 w-28 bg-white border border-[#DDD9D9] shadow-xl rounded-2xl z-50 overflow-hidden">
+                    <div
+                      data-dropdown-index={index}
+                      className="absolute right-0 mt-3 w-28 bg-white border border-[#DDD9D9] shadow-xl rounded-2xl z-50 overflow-hidden"
+                    >
                       <button
                         onClick={() => openEdit(member)}
                         className="w-full text-center py-2 text-black hover:bg-gray-50"
@@ -86,9 +103,8 @@ const Nember = () => {
                         Edit
                       </button>
 
-                      <div className="border-t border-[#DDD9D9]"></div>
+                      <div className="border-t border-[#DDD9D9]" />
 
-                      {/* DELETE MEMBER */}
                       <button
                         onClick={() => deleteMember(member.email)}
                         className="w-full text-center py-2 text-red-600 hover:bg-red-50"
@@ -102,7 +118,7 @@ const Nember = () => {
             </div>
           ))}
 
-          {/* ADD MEMBER CARD */}
+          {/* add member */}
           <div className="bg-[#f7fdff] rounded-xl text-center py-4 px-3 flex flex-col items-center justify-center h-56 cursor-pointer">
             <div className="bg-white rounded-full w-12 h-12 flex items-center justify-center text-blue-500 border-2 border-dashed border-blue-300">
               <Plus className="w-5 h-5" />
@@ -112,24 +128,21 @@ const Nember = () => {
         </div>
       </div>
 
-      {/* ---------- POPUP EDIT MODAL (3×4 LAYOUT) ---------- */}
+      {/* Edit modal */}
       {openEditModal && selectedMember && (
         <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-[90%] md:w-[650px] p-8 relative shadow-2xl">
-
-            {/* X BUTTON */}
+          <div className="bg-white rounded-3xl w-[90%] md:w-[550px] p-6 relative shadow-2xl">
             <button
               onClick={() => setOpenEditModal(false)}
-              className="absolute top-5 right-5 text-gray-500 hover:text-black"
+              className="absolute top-4 right-4 text-gray-500 hover:text-black"
             >
-              <X size={24} />
+              <X size={22} />
             </button>
 
-            {/* HEADER */}
-            <div className="flex items-center gap-4 border-b border-[#DDD9D9] pb-4 mb-6">
+            <div className="flex items-center gap-4 pb-5">
               <img
                 src={`https://i.pravatar.cc/150?img=${selectedMember.img}`}
-                className="w-20 h-20 rounded-full"
+                className="w-16 h-16 rounded-full"
                 alt="profile"
               />
               <div>
@@ -138,42 +151,38 @@ const Nember = () => {
               </div>
             </div>
 
-            {/* 3×4 GRID */}
-            <div className="grid grid-cols-3 gap-6 text-sm text-gray-700">
-
-              <div className="col-span-1">
+            <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+              <div>
                 <p className="font-semibold">Email Address</p>
                 <p className="text-gray-500">{selectedMember.email}</p>
               </div>
 
-              <div className="col-span-1">
+              <div>
                 <p className="font-semibold">Phone Number</p>
                 <p className="text-gray-500">{selectedMember.phone}</p>
               </div>
 
-              <div className="col-span-1">
-                <p className="font-semibold">Date Joined</p>
-                <p className="text-gray-500">{selectedMember.joined}</p>
-              </div>
-
-              <div className="col-span-3">
+              <div>
                 <p className="font-semibold">Roles</p>
-                <div className="flex items-center gap-6 mt-1">
-                  <label className="flex items-center gap-2">
-                    <input type="radio" name="role" defaultChecked={selectedMember.role === "Admin"} />
+                <div className="flex items-center gap-3 mt-1">
+                  <label className="flex items-center gap-1">
+                    <input type="radio" name={`role-${selectedMember.email}`} defaultChecked={selectedMember.role === "Admin"} />
                     Admin
                   </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" name="role" defaultChecked={selectedMember.role === "Employee"} />
+                  <label className="flex items-center gap-1">
+                    <input type="radio" name={`role-${selectedMember.email}`} defaultChecked={selectedMember.role === "Employee"} />
                     Employee
                   </label>
                 </div>
               </div>
 
+              <div>
+                <p className="font-semibold">Date Joined</p>
+                <p className="text-gray-500">{selectedMember.joined}</p>
+              </div>
             </div>
 
-            {/* FOOTER BUTTONS */}
-            <div className="flex justify-between mt-10">
+            <div className="flex justify-between mt-8">
               <button className="px-6 py-2 rounded-full border border-red-400 text-red-500 hover:bg-red-50">
                 Restrict
               </button>
@@ -184,12 +193,9 @@ const Nember = () => {
                 Dismiss
               </button>
             </div>
-
           </div>
         </div>
       )}
     </>
   );
-};
-
-export default Nember;
+}
