@@ -1,20 +1,47 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
-
-// initial data
-const initialMembers = [
-  { name: "Mohan Kumar", email: "mohan@taskfleet.com", img: 1, role: "Admin", phone: "+91 62681 85883", joined: "12-02-2025" },
-  { name: "Thor Odinson", email: "thor@ddrussell.com", img: 2, role: "Employee", phone: "+91 98765 43210", joined: "21-01-2025" },
-  { name: "Tanmay Pardhi", email: "tanmay@company.com", img: 3, role: "Employee", phone: "+91 99881 22882", joined: "05-02-2025" },
-];
-
-const isAdmin = true;
+import axios from "axios";
+import { BASE_URL } from "../../utility/Config";
 
 export default function Nember() {
-  const [members, setMembers] = useState(initialMembers);
-  const [openMenuIndex, setOpenMenuIndex] = useState(null); // index of open menu or null
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openMenuIndex, setOpenMenuIndex] = useState(null);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+
+  // Fetch company users from API
+  useEffect(() => {
+    const fetchCompanyUsers = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${BASE_URL}/company/users`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Map API response to component structure
+        const mappedUsers = response.data.users.map((user, idx) => ({
+          name: user.name,
+          email: user.email,
+          img: (idx % 70) + 1, // Random avatar
+          role: user.role === 'user' ? 'Employee' : user.role,
+          phone: user.mobile || 'N/A',
+          joined: new Date(user.createdAt).toLocaleDateString('en-GB'),
+          _id: user._id
+        }));
+        
+        setMembers(mappedUsers);
+      } catch (error) {
+        console.error('Error fetching company users:', error);
+        alert('Failed to load team members');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCompanyUsers();
+  }, []);
 
   // close dropdown when click outside current menu/button
   useEffect(() => {
@@ -50,6 +77,19 @@ export default function Nember() {
       setSelectedMember(null);
     }
   };
+
+  const isAdmin = true; // Set based on user role from token/context
+
+  if (loading) {
+    return (
+      <div className="bg-gray-100 flex flex-col rounded-2xl p-6">
+        <h2 className="text-3xl font-semibold p-4">Team Members</h2>
+        <div className="flex justify-center items-center h-64">
+          <p className="text-gray-500">Loading team members...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
