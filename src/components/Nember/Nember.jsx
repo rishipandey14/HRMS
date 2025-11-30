@@ -54,7 +54,7 @@ export default function Nember() {
   return (
     <>
       <div className="bg-gray-100 flex flex-col rounded-2xl p-6">
-        <h2 className="text-xl font-semibold p-4">Team Members</h2>
+        <h2 className="text-3xl font-semibold p-4">Team Members</h2>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {members.map((member, index) => (
