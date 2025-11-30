@@ -1,11 +1,11 @@
- import React from 'react'
-import ProjectPage from '../components/Project/ProjectPage'
+import React from 'react'
+import Nember from '../components/Nember/Nember'
  
  
  const Team = () => {
    return (
      <div>
-        <ProjectPage /> 
+        <Nember /> 
      </div>
    )
  }
