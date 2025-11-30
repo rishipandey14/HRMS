@@ -3,8 +3,7 @@ import { Facebook, Instagram, Mail, MapPin, Phone, Twitter } from "lucide-react"
 
 const ContactPage = () => {
   return (
-    <div className=" bg-gray-300 h-[100vh] p-4">
-    <div className="h-[100%] p-6 md:p-12 hidden md:flex flex-col items-center rounded-4xl bg-white ">
+    <div className="h-[100%] p-6 md:p-10 hidden md:flex flex-col items-center rounded-4xl bg-white ">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="font-bold text-4xl mb-2">Contact Us</h1>
@@ -89,7 +88,7 @@ const ContactPage = () => {
 
       
      {/* Footer Info */}
-<div className="mt-12 w-[100%] ">
+<div className="mt-10 w-[100%] ">
   <div className="max-w-4xl mx-auto">
     {/* Heading */}
     <div className="flex justify-center mb-4">
@@ -121,7 +120,6 @@ const ContactPage = () => {
       <Facebook />
     </div> */}
   </div>
-</div>
 </div>
 </div>
   );

@@ -4,6 +4,8 @@ import { User, CreditCard, Puzzle, ShieldCheck, Trash2 } from "lucide-react";
 import ProfileSetting from './ProfileSetting';
 import Delete from './Delete';
 import Billing from './Billing';
+import Integrations from './Integrations';
+import SecuritySettings from './SecuritySettings';
 
 const Setting = () => {
   const [activetab, setactivetab] = useState("profile");
@@ -46,6 +48,8 @@ const Setting = () => {
         {activetab === "profile" && <ProfileSetting />}
         {activetab === "delete" && <Delete />}
         {activetab === "billing" && <Billing />}
+        {activetab === "integrations" && <Integrations />}
+        {activetab === "security" && <SecuritySettings/>}
       </main>
     </div>
   );

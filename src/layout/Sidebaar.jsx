@@ -15,7 +15,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 
 const menuItems = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/" },
+  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
   { label: "Projects", icon: FolderKanban, to: "/projects" },
   { label: "Calendar", icon: Calendar, to: "/calendar" },
   { label: "Chat", icon: MessageSquare, to: "/chat" },

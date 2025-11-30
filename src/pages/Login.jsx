@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import axios from "axios";
-import { BASE_URL } from "../utility/Config";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
+  const navigate = useNavigate();
+  
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -11,47 +12,17 @@ const Login = () => {
   const [companyId, setCompanyId] = useState("");
   const [showPasswordRules, setShowPasswordRules] = useState(false);
 
-  const [signinemail, setsigninEmail] = useState("test@gmail.com");
-  const [signinpassword, setsigninPassword] = useState("Test@123");
+  const [signinemail, setsigninEmail] = useState("");
+  const [signinpassword, setsigninPassword] = useState("");
 
   const [form, setForm] = useState(1);
-  const [error, setError] = useState("");
 
-  // Tab switcher for form view
-  const switchToSigninForm = () => setForm(2);
-  const switchToSignupForm = () => setForm(1);
-
-  const handleSignin = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (!signinemail.trim() || !signinpassword.trim()) {
-      setError("Please enter both email and password.");
-      return;
-    }
-    try {
-      const res = await axios.post(
-        BASE_URL + "/auth/login",
-        { email: signinemail, password: signinpassword },
-        { withCredentials: true }
-      );
-      // If backend returns user data, handle it here
-      const user = res?.data?.user || res?.data?.data || res?.data;
-      // Redirect to dashboard
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 100);
-    } catch (err) {
-      setError(
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message ||
-        "Something went wrong"
-      );
-    }
+  const handlesignin = () => {
+    setForm((prev) => prev + 1);
   };
 
-  const handleSignup = async (e) => {
-    // TODO: implement signup API call
+  const handlesignup = () => {
+    setForm((prev) => prev - 1);
   };
 
   const validatePassword = (pwd) => {
@@ -114,7 +85,7 @@ const Login = () => {
               </button>
               <button
                 type="button"
-                onClick={switchToSigninForm}
+                onClick={handlesignin}
                 className="flex-1 py-2 text-xs text-gray-600 rounded-xl hover:bg-gray-100 transition"
               >
                 Sign In
@@ -219,9 +190,12 @@ const Login = () => {
                   onChange={(e) => setCompanyId(e.target.value)}
                 />
               </div>
-
-              <div className="text-xs text-[#736e88] flex justify-end">
-                Company?
+              
+              <div
+                  className="text-xs text-[#736e88] flex justify-end cursor-pointer hover:underline"
+                  onClick={() => navigate("/orgsetup")}
+                >
+                  Company? 
               </div>
 
               {/* Submit Button */}
@@ -283,7 +257,7 @@ const Login = () => {
             <div className="flex mb-6 rounded-xl p-1 bg-gray-200">
               <button
                 type="button"
-                onClick={switchToSignupForm}
+                onClick={handlesignup}
                 className="flex-1 py-2 text-xs text-gray-600 hover:bg-gray-100 transition rounded-xl"
               >
                 Sign Up
@@ -333,7 +307,6 @@ const Login = () => {
               <button
                 type="submit"
                 className="w-full bg-[#20A4F3] text-white py-2 rounded hover:bg-blue-600 transition text-xs mt-4"
-                onClick={handleSignin}
               >
                 Login
               </button>
