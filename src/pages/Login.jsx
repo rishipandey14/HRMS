@@ -34,8 +34,10 @@ const Login = () => {
         { email: signinemail, password: signinpassword },
         { withCredentials: true }
       );
-      // If backend returns user data, handle it here
-      const user = res?.data?.user || res?.data?.data || res?.data;
+      // Store token in localStorage
+      if (res.data.token) {
+        localStorage.setItem('token', res.data.token);
+      }
       // Redirect to dashboard
       setTimeout(() => {
         window.location.href = "/dashboard";
