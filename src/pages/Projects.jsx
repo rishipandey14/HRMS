@@ -1,7 +1,9 @@
 "use client"
 
 import { Plus, Eye, MessageCircle } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { BASE_URL } from "../utility/Config"
 
 // Define colors directly in the component file
 const colors = {
@@ -203,119 +205,212 @@ function ProjectColumn({ title, count, projects, type, isAdminPanelOpen, isUserP
 export default function ProjectsView() {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isUserPanelOpen, setIsUserPanelOpen] = useState(true);
-  const pendingProjects = [
-    {
-      id: 1,
-      title: "UI/UX Design in the age of AI",
-      priority: "Important",
-      progress: 0,
-      status: "pending",
-      team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-      stats: { views: 11, comments: 187 },
-    },
-    {
-      id: 2,
-      title: "Responsive Website Design for 23 more clients",
-      priority: "Meh",
-      progress: 0,
-      status: "pending",
-      team: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      stats: { views: 32, comments: 115 },
-    },
-    {
-      id: 3,
-      title: "Blog Copywriting (Low priority 😴)",
-      priority: "OK",
-      progress: 0,
-      status: "pending",
-      team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-      stats: { views: 987, comments: 21800 },
-    },
-    {
-      id: 4,
-      title: "Landing page for Azunyan senpai",
-      priority: "Not that important",
-      progress: 0,
-      status: "pending",
-      team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
+  const [pendingProjectsApi, setPendingProjectsApi] = useState([]);
+  const [inProgressProjectsApi, setInProgressProjectsApi] = useState([]);
+  const [completedProjectsApi, setCompletedProjectsApi] = useState([]);
+  const [loading, setLoading] = useState(true);
+  // Static dataset (kept as requested). Using API below for live data.
+  // const pendingProjects = [
+  //   {
+  //     id: 1,
+  //     title: "UI/UX Design in the age of AI",
+  //     priority: "Important",
+  //     progress: 0,
+  //     status: "pending",
+  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
+  //     stats: { views: 11, comments: 187 },
+  //   },
+  //   {
+  //     id: 2,
+  //     title: "Responsive Website Design for 23 more clients",
+  //     priority: "Meh",
+  //     progress: 0,
+  //     status: "pending",
+  //     team: [
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //     ],
+  //     stats: { views: 32, comments: 115 },
+  //   },
+  //   {
+  //     id: 3,
+  //     title: "Blog Copywriting (Low priority 😴)",
+  //     priority: "OK",
+  //     progress: 0,
+  //     status: "pending",
+  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
+  //     stats: { views: 987, comments: 21800 },
+  //   },
+  //   {
+  //     id: 4,
+  //     title: "Landing page for Azunyan senpai",
+  //     priority: "Not that important",
+  //     progress: 0,
+  //     status: "pending",
+  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
+  //     stats: { views: 0, comments: 0 },
+  //   },
+  // ]
+  // const inProgressProjects = [
+  //   {
+  //     id: 5,
+  //     title: "Machine Learning Progress",
+  //     priority: "Important",
+  //     progress: 52,
+  //     status: "progress",
+  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
+  //     stats: { views: 11, comments: 187 },
+  //   },
+  //   {
+  //     id: 6,
+  //     title: "Learn Computer Science",
+  //     priority: "Meh",
+  //     progress: 30,
+  //     status: "progress",
+  //     team: [
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //     ],
+  //     stats: { views: 32, comments: 115 },
+  //   },
+  // ]
+  // const completedProjects = [
+  //   {
+  //     id: 7,
+  //     title: "User flow confirmation for fintech App",
+  //     priority: "Important",
+  //     progress: 100,
+  //     status: "completed",
+  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
+  //     stats: { views: 11, comments: 2200 },
+  //   },
+  //   {
+  //     id: 8,
+  //     title: "Do some usual chores",
+  //     priority: "High Priority",
+  //     progress: 100,
+  //     status: "completed",
+  //     team: [
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //     ],
+  //     stats: { views: 1, comments: 87 },
+  //   },
+  //   {
+  //     id: 9,
+  //     title: "Write a few articles for slothUI",
+  //     priority: "",
+  //     progress: 100,
+  //     status: "completed",
+  //     team: ["/placeholder.svg?height=24&width=24"],
+  //     stats: { views: 987, comments: 21800 },
+  //   },
+  //   {
+  //     id: 10,
+  //     title: "Transform into a cyborg",
+  //     priority: "OK",
+  //     progress: 100,
+  //     status: "completed",
+  //     team: [
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //       "/placeholder.svg?height=24&width=24",
+  //     ],
+  //     stats: { views: 987, comments: 21800 },
+  //   },
+  // ]
+
+  // Decode token role and fetch projects for the company
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const isAdmin = payload.role === 'admin';
+        setIsAdminPanelOpen(isAdmin);
+        setIsUserPanelOpen(!isAdmin);
+
+        const companyId = payload.companyCode || payload.id; // company tokens may not have companyCode
+        if (companyId) {
+          fetchProjects(companyId, token);
+        } else {
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error('Failed to parse token', e);
+        setLoading(false);
+      }
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchProjects = async (companyId, token) => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${BASE_URL}/projects/company/${companyId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const projects = res.data.projects || [];
+      categorizeProjects(projects);
+    } catch (err) {
+      console.error('Error loading projects:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const categorizeProjects = (projects) => {
+    const now = new Date();
+    const toCard = (p) => ({
+      id: p._id,
+      title: p.title,
+      priority: '',
+      progress: deriveProgress(p, now),
+      status: deriveStatus(p, now),
+      team: [],
       stats: { views: 0, comments: 0 },
-    },
-  ]
-  const inProgressProjects = [
-    {
-      id: 5,
-      title: "Machine Learning Progress",
-      priority: "Important",
-      progress: 52,
-      status: "progress",
-      team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-      stats: { views: 11, comments: 187 },
-    },
-    {
-      id: 6,
-      title: "Learn Computer Science",
-      priority: "Meh",
-      progress: 30,
-      status: "progress",
-      team: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      stats: { views: 32, comments: 115 },
-    },
-  ]
-  const completedProjects = [
-    {
-      id: 7,
-      title: "User flow confirmation for fintech App",
-      priority: "Important",
-      progress: 100,
-      status: "completed",
-      team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-      stats: { views: 11, comments: 2200 },
-    },
-    {
-      id: 8,
-      title: "Do some usual chores",
-      priority: "High Priority",
-      progress: 100,
-      status: "completed",
-      team: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      stats: { views: 1, comments: 87 },
-    },
-    {
-      id: 9,
-      title: "Write a few articles for slothUI",
-      priority: "",
-      progress: 100,
-      status: "completed",
-      team: ["/placeholder.svg?height=24&width=24"],
-      stats: { views: 987, comments: 21800 },
-    },
-    {
-      id: 10,
-      title: "Transform into a cyborg",
-      priority: "OK",
-      progress: 100,
-      status: "completed",
-      team: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      stats: { views: 987, comments: 21800 },
-    },
-  ]
+    });
+
+    const pending = [];
+    const progress = [];
+    const completed = [];
+
+    projects.forEach((p) => {
+      const card = toCard(p);
+      if (card.status === 'pending') pending.push(card);
+      else if (card.status === 'progress') progress.push(card);
+      else completed.push(card);
+    });
+
+    setPendingProjectsApi(pending);
+    setInProgressProjectsApi(progress);
+    setCompletedProjectsApi(completed);
+  };
+
+  const deriveStatus = (p, now) => {
+    const start = p.startDate ? new Date(p.startDate) : null;
+    const end = p.endDate ? new Date(p.endDate) : null;
+    if (end && end < now) return 'completed';
+    if (start && start > now) return 'pending';
+    return 'progress';
+  };
+
+  const deriveProgress = (p, now) => {
+    const start = p.startDate ? new Date(p.startDate) : null;
+    const end = p.endDate ? new Date(p.endDate) : null;
+    if (!start || !end || end <= start) return 0;
+    if (end < now) return 100;
+    if (start > now) return 0;
+    const total = end - start;
+    const elapsed = now - start;
+    const pct = Math.max(0, Math.min(100, Math.round((elapsed / total) * 100)));
+    return pct;
+  };
   return (
     <div
       className="flex min-h-screen flex-col transparent-scrollbar"
@@ -330,9 +425,9 @@ export default function ProjectsView() {
               </h1>
             </div>
             <div className="grid h-full items-start gap-8 lg:grid-cols-3 md:grid-cols-2 grid-cols-1">
-              <ProjectColumn title="Upcoming" count={8} projects={pendingProjects} type="Upcoming" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
-              <ProjectColumn title="In Progress" count={2} projects={inProgressProjects} type="progress" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
-              <ProjectColumn title="Completed" count={7} projects={completedProjects} type="completed" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
+              <ProjectColumn title="Upcoming" count={pendingProjectsApi.length} projects={pendingProjectsApi} type="Upcoming" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
+              <ProjectColumn title="In Progress" count={inProgressProjectsApi.length} projects={inProgressProjectsApi} type="progress" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
+              <ProjectColumn title="Completed" count={completedProjectsApi.length} projects={completedProjectsApi} type="completed" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
             </div>
           </div>
         </main>

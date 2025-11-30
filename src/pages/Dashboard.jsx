@@ -1,17 +1,112 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { TrendingUp, Video, Pause, Square, Search, Plus, MonitorX } from "lucide-react"
+import { TrendingUp, Video, Pause, Square, Search, Plus, MonitorX, X } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import axios from "axios"
+import { BASE_URL } from "../utility/Config"
 
 const Dashboard = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280)
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-  const [isUserPanelOpen, setIsUserPanelOpen] = useState(true); // or false, as needed
+  const [isUserPanelOpen, setIsUserPanelOpen] = useState(true);
   const [showAppsPopup, setShowAppsPopup] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [projectForm, setProjectForm] = useState({
+    title: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    participants: []
+  });
+  const [companyUsers, setCompanyUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const appsBtnRef = useRef(null);
   const popupRef = useRef(null);
 
+  // Check user role from token
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const isAdmin = payload.role === 'admin';
+        setIsAdminPanelOpen(isAdmin);
+        setIsUserPanelOpen(!isAdmin);
+      } catch (error) {
+        console.error('Error parsing token:', error);
+        setIsAdminPanelOpen(false);
+        setIsUserPanelOpen(true);
+      }
+    }
+  }, []);
+
+  // Fetch company users when modal opens
+  useEffect(() => {
+    if (showProjectModal && isAdminPanelOpen) {
+      fetchCompanyUsers();
+    }
+  }, [showProjectModal]);
+
+  const fetchCompanyUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/company/users`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCompanyUsers(response.data.users || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${BASE_URL}/projects`,
+        projectForm,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      alert('Project created successfully!');
+      setShowProjectModal(false);
+      setProjectForm({
+        title: '',
+        description: '',
+        startDate: '',
+        endDate: '',
+        participants: []
+      });
+      // Optionally refresh projects list here
+    } catch (error) {
+      console.error('Error creating project:', error);
+      alert(error.response?.data?.error || 'Failed to create project');
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setProjectForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleParticipantToggle = (userId) => {
+    setProjectForm(prev => ({
+      ...prev,
+      participants: prev.participants.includes(userId)
+        ? prev.participants.filter(id => id !== userId)
+        : [...prev.participants, userId]
+    }));
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -100,7 +195,10 @@ const Dashboard = () => {
             )}
           </div>
           {isAdminPanelOpen && (
-            <button className="px-6 py-3 bg-white text-blue-600 border border-blue-600 rounded-full text-sm font-medium cursor-pointer flex items-center gap-2 transition-all duration-200 hover:bg-blue-600 hover:text-white">
+            <button 
+              onClick={() => setShowProjectModal(true)}
+              className="px-6 py-3 bg-white text-blue-600 border border-blue-600 rounded-full text-sm font-medium cursor-pointer flex items-center gap-2 transition-all duration-200 hover:bg-blue-600 hover:text-white"
+            >
               <Plus size={16} />
               Add Projects
             </button>
@@ -401,6 +499,132 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Create Project Modal */}
+      {showProjectModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-[90%] md:w-[600px] p-8 relative shadow-2xl">
+            <button
+              onClick={() => setShowProjectModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-black"
+            >
+              <X size={22} />
+            </button>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Project</h2>
+
+            <form onSubmit={handleCreateProject} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Project Title *
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  value={projectForm.title}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
+                  placeholder="Enter project title"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={projectForm.description}
+                  onChange={handleInputChange}
+                  rows="3"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
+                  placeholder="Enter project description"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    name="startDate"
+                    value={projectForm.startDate}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    name="endDate"
+                    value={projectForm.endDate}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Assign Team Members ({projectForm.participants.length} selected)
+                </label>
+                {loadingUsers ? (
+                  <div className="text-sm text-gray-500 py-4">Loading team members...</div>
+                ) : (
+                  <div className="border border-gray-300 rounded-xl max-h-48 overflow-y-auto">
+                    {companyUsers.length === 0 ? (
+                      <div className="text-sm text-gray-500 p-4">No team members available</div>
+                    ) : (
+                      <div className="p-3 space-y-2">
+                        {companyUsers.map((user) => (
+                          <label
+                            key={user._id}
+                            className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={projectForm.participants.includes(user._id)}
+                              onChange={() => handleParticipantToggle(user._id)}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                              <div className="text-xs text-gray-500">{user.email}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowProjectModal(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-blue-600 rounded-full text-white hover:bg-blue-700"
+                >
+                  Create Project
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
