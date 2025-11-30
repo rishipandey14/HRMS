@@ -51,7 +51,48 @@ const Login = () => {
   };
 
   const handleSignup = async (e) => {
-    // TODO: implement signup API call
+    e.preventDefault();
+    setError("");
+    
+    if (
+      !name.trim() ||
+      !email.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim() ||
+      !mobile.trim() ||
+      !companyId.trim()
+    ) {
+      setError("Please fill all fields before signing up.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        BASE_URL + "/user/signup", 
+        { name, email, password, mobile, companyCode: companyId }, 
+        { withCredentials: true }
+      );
+      const user = res?.data?.data;
+      // dispatch(addUser(user));
+      // dispatch(showToast("Account created Successfully"));
+      
+      // Wait a bit for Redux to update before navigating
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 100);
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Something went wrong"
+      );
+    }
   };
 
   const validatePassword = (pwd) => {
@@ -122,7 +163,7 @@ const Login = () => {
             </div>
 
             {/* Form */}
-            <form className="space-y-2">
+            <form className="space-y-2" onSubmit={handleSignup}>
               {/* Name */}
               <div>
                 <label className="block mb-1 font-medium text-xs text-[#26203B]">
@@ -228,6 +269,7 @@ const Login = () => {
               <button
                 type="submit"
                 className="w-full bg-[#20A4F3] text-white py-2 rounded hover:bg-blue-600 transition text-xs mt-4"
+                onClick={handleSignup}
               >
                 Create Account
               </button>
