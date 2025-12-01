@@ -1,4 +1,7 @@
- import React from "react";
+"use client";
+
+import React, { useState } from "react";
+import Submit from "../Basic/submit"; // <-- Correct component import
 
 const tasks = [
   {
@@ -66,9 +69,17 @@ const statusColor = {
 };
 
 const Task = () => {
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+
+  // Open popup with dynamic title
+  const openPopup = (task, type) => {
+    setPopupTitle(`${type} - ${task.description}`);
+    setPopupOpen(true);
+  };
+
   return (
     <div className="w-full p-3 sm:p-4 lg:py-6">
-      {/* Horizontal scroll container */}
       <div className="overflow-x-auto w-full">
         <table className="w-full table-auto border-separate border-spacing-y-3 min-w-[900px]">
           <thead>
@@ -82,53 +93,71 @@ const Task = () => {
               <th className="px-4 lg:px-6 py-4 rounded-r-lg">Submit</th>
             </tr>
           </thead>
+
           <tbody>
             {tasks.map((task, index) => (
-              <tr
-                key={index}
-                className="bg-white text-sm text-gray-800 rounded-lg shadow-sm"
-              >
-                <td className="px-4 lg:px-6 py-5 rounded-l-lg whitespace-nowrap">
+              <tr key={index} className="bg-white text-sm text-gray-800 rounded-lg shadow-sm">
+                <td className="px-4 lg:px-6 py-5 rounded-l-lg">
                   {task.description}
                 </td>
-                <td className="px-4 lg:px-6 py-5 whitespace-nowrap">
+
+                <td className="px-4 lg:px-6 py-5">
                   <div className="flex items-center gap-2">
                     <img
                       src={`https://i.pravatar.cc/150?img=${task.avatar}`}
                       alt={task.assignedTo}
-                      className="w-8 h-8 lg:w-9 lg:h-9 rounded-full flex-shrink-0"
+                      className="w-8 h-8 rounded-full"
                     />
                     <span>{task.assignedTo}</span>
                   </div>
                 </td>
-                <td className="px-4 lg:px-6 py-5 text-gray-600 whitespace-nowrap">
+
+                <td className="px-4 lg:px-6 py-5 text-gray-600">
                   {task.startDate}
                 </td>
-                <td className="px-4 lg:px-6 py-5 text-gray-600 whitespace-nowrap">
+
+                <td className="px-4 lg:px-6 py-5 text-gray-600">
                   {task.dueDate}
                 </td>
-                <td className="px-4 lg:px-6 py-5 whitespace-nowrap">
-                  <span
-                    className={`text-xs font-medium px-2 py-1 border rounded-full ${statusColor[task.status]}`}
-                  >
+
+                <td className="px-4 lg:px-6 py-5">
+                  <span className={`text-xs font-medium px-2 py-1 border rounded-full ${statusColor[task.status]}`}>
                     {task.status}
                   </span>
                 </td>
-                <td className="px-4 lg:px-6 py-5 whitespace-nowrap">
-                  <button className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition-all">
+
+                {/* UPDATE BUTTON */}
+                <td className="px-4 lg:px-6 py-5">
+                  <button
+                    onClick={() => openPopup(task, "Update")}
+                    className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition"
+                  >
                     Updates
                   </button>
                 </td>
-                <td className="px-4 lg:px-6 py-5 rounded-r-lg whitespace-nowrap">
-                  <button className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition-all">
+
+                {/* SUBMIT BUTTON */}
+                <td className="px-4 lg:px-6 py-5">
+                  <button
+                    onClick={() => openPopup(task, "Submit")}
+                    className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition"
+                  >
                     Submit
                   </button>
                 </td>
+
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* 2-STEP POPUP COMPONENT */}
+      <Submit
+        isOpen={popupOpen}
+        onClose={() => setPopupOpen(false)}
+        title={popupTitle}
+      />
     </div>
   );
 };
