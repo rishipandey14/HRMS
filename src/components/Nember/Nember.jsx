@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import axios from "axios";
 import { BASE_URL } from "../../utility/Config";
+import ViewProfile from "../Basic/viewprofile"; // ✅ IMPORT VIEW PROFILE POPUP
 
 export default function Nember() {
   const [members, setMembers] = useState([]);
@@ -9,6 +10,7 @@ export default function Nember() {
   const [openMenuIndex, setOpenMenuIndex] = useState(null);
   const [openEditModal, setOpenEditModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [openViewProfile, setOpenViewProfile] = useState(false);
 
   // Fetch company users from API
   useEffect(() => {
@@ -21,7 +23,15 @@ export default function Nember() {
         });
         
         // Map API response to component structure
-        const mappedUsers = response.data.users.map((user, idx) => ({
+        const usersData = response.data.users || response.data || [];
+        
+        if (!Array.isArray(usersData)) {
+          console.error('Invalid API response format:', response.data);
+          setMembers([]);
+          return;
+        }
+        
+        const mappedUsers = usersData.map((user, idx) => ({
           name: user.name,
           email: user.email,
           img: (idx % 70) + 1, // Random avatar
@@ -34,7 +44,9 @@ export default function Nember() {
         setMembers(mappedUsers);
       } catch (error) {
         console.error('Error fetching company users:', error);
-        alert('Failed to load team members');
+        console.error('BASE_URL:', BASE_URL);
+        console.error('Token exists:', !!localStorage.getItem('token'));
+        alert(`Failed to load team members. API URL: ${BASE_URL}`);
       } finally {
         setLoading(false);
       }
@@ -48,14 +60,12 @@ export default function Nember() {
     const onDocClick = (e) => {
       if (openMenuIndex === null) return;
 
-      // If clicked inside the open dropdown or its button, do nothing
       const insideDropdown = e.target.closest(`[data-dropdown-index="${openMenuIndex}"]`);
       const insideButton = e.target.closest(`[data-menu-button-index="${openMenuIndex}"]`);
 
       if (insideDropdown || insideButton) {
         return;
       }
-      // otherwise close
       setOpenMenuIndex(null);
     };
 
@@ -111,18 +121,23 @@ export default function Nember() {
               <h3 className="text-md font-bold text-gray-800">{member.name}</h3>
               <p className="text-xs text-gray-500 pb-12">{member.email}</p>
 
-              <button className="bg-blue-500 text-white w-full text-xs py-3 px-3 rounded-b-2xl hover:bg-blue-600">
+              {/* ⭐ UPDATED VIEW PROFILE BUTTON ⭐ */}
+              <button
+                className="bg-blue-500 text-white w-full text-xs py-3 px-3 rounded-b-2xl hover:bg-blue-600"
+                onClick={() => {
+                  setSelectedMember(member);
+                  setOpenViewProfile(true); // OPEN POPUP
+                }}
+              >
                 View Profile
               </button>
 
               {isAdmin && (
                 <div className="absolute top-2 right-2">
-                  {/* menu button has data attribute with index */}
                   <button
-                    onClick={(ev) => {
-                      // toggle this index
-                      setOpenMenuIndex((cur) => (cur === index ? null : index));
-                    }}
+                    onClick={() =>
+                      setOpenMenuIndex((cur) => (cur === index ? null : index))
+                    }
                     data-menu-button-index={index}
                     className="text-gray-400 hover:text-gray-500"
                     aria-label="open menu"
@@ -130,7 +145,6 @@ export default function Nember() {
                     •••
                   </button>
 
-                  {/* Dropdown: mark with data-dropdown-index */}
                   {openMenuIndex === index && (
                     <div
                       data-dropdown-index={index}
@@ -158,7 +172,6 @@ export default function Nember() {
             </div>
           ))}
 
-          {/* add member */}
           <div className="bg-[#f7fdff] rounded-xl text-center py-4 px-3 flex flex-col items-center justify-center h-56 cursor-pointer">
             <div className="bg-white rounded-full w-12 h-12 flex items-center justify-center text-blue-500 border-2 border-dashed border-blue-300">
               <Plus className="w-5 h-5" />
@@ -168,7 +181,7 @@ export default function Nember() {
         </div>
       </div>
 
-      {/* Edit modal */}
+      {/* Existing EDIT MODAL (UNTOUCHED) */}
       {openEditModal && selectedMember && (
         <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/30 backdrop-blur-sm">
           <div className="bg-white rounded-3xl w-[90%] md:w-[550px] p-6 relative shadow-2xl">
@@ -236,6 +249,18 @@ export default function Nember() {
           </div>
         </div>
       )}
+
+      {/* ⭐ NEW VIEW PROFILE POPUP ⭐ */}
+      {openViewProfile && selectedMember && (
+  <ViewProfile
+    isOpen={openViewProfile}
+    data={{
+      ...selectedMember,
+      img: `https://i.pravatar.cc/150?img=${selectedMember.img}`,
+    }}
+    onClose={() => setOpenViewProfile(false)}
+  />
+)}
     </>
   );
 }

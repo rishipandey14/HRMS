@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { BASE_URL } from "../utility/Config";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [name, setName] = useState("");
@@ -10,6 +11,7 @@ const Login = () => {
   const [mobile, setMobile] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [showPasswordRules, setShowPasswordRules] = useState(false);
+  const navigate = useNavigate();
 
   const [signinemail, setsigninEmail] = useState("test@gmail.com");
   const [signinpassword, setsigninPassword] = useState("Test@123");
@@ -263,8 +265,11 @@ const Login = () => {
                 />
               </div>
 
-              <div className="text-xs text-[#736e88] flex justify-end">
-                Company?
+              <div
+                  className="text-xs text-[#736e88] flex justify-end cursor-pointer hover:underline"
+                  onClick={() => navigate("/orgsetup")}
+                >
+                  Company? 
               </div>
 
               {/* Submit Button */}
