@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { BASE_URL } from "../utility/Config";
 import { useNavigate } from "react-router-dom";
+import WaitingForApproval from "./unapprove";
 
 const Login = () => {
   const [name, setName] = useState("");
@@ -18,6 +19,7 @@ const Login = () => {
 
   const [form, setForm] = useState(1);
   const [error, setError] = useState("");
+  const [isUnapproved, setIsUnapproved] = useState(false);
 
   // Tab switcher for form view
   const switchToSigninForm = () => setForm(2);
@@ -45,6 +47,11 @@ const Login = () => {
         window.location.href = "/dashboard";
       }, 100);
     } catch (err) {
+      // Check if user is awaiting approval
+      if (err?.response?.status === 403 && err?.response?.data?.msg === 'Awaiting admin approval') {
+        setIsUnapproved(true);
+        return;
+      }
       setError(
         err?.response?.data?.error ||
         err?.response?.data?.message ||
@@ -85,10 +92,8 @@ const Login = () => {
       // dispatch(addUser(user));
       // dispatch(showToast("Account created Successfully"));
       
-      // Wait a bit for Redux to update before navigating
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 100);
+      // New users are created with 'unauthorized' role, show waiting screen
+      setIsUnapproved(true);
     } catch (err) {
       setError(
         err?.response?.data?.error ||
@@ -108,6 +113,11 @@ const Login = () => {
     setPassword(value);
     setShowPasswordRules(validatePassword(value));
   };
+
+  // Show waiting for approval screen if user is unapproved
+  if (isUnapproved) {
+    return <WaitingForApproval />;
+  }
 
   return (
     <div className="flex h-[100vh]">
@@ -272,6 +282,13 @@ const Login = () => {
                   Company? 
               </div>
 
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded text-xs">
+                  {error}
+                </div>
+              )}
+
               {/* Submit Button */}
               <button
                 type="submit"
@@ -378,6 +395,13 @@ const Login = () => {
               <div className="text-xs text-[#736e88] flex justify-end">
                 Forgot Password?
               </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded text-xs">
+                  {error}
+                </div>
+              )}
 
               <button
                 type="submit"
