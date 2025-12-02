@@ -56,7 +56,7 @@ const SubmitPopup = ({ isOpen, onClose, title }) => {
 
         {/* CANCEL BUTTON (left side) */}
         <button
-          onClick={() => setOpenDescriptionPopup(false)}
+          onClick={() => { setOpenDescriptionPopup(false); onClose(); }}
           className="px-4 py-1 rounded-full border border-gray-300 text-gray-600 text-sm"
         >
           Cancel
