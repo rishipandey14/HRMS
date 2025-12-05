@@ -4,28 +4,141 @@ import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { BASE_URL } from "../../utility/Config";
+import { validateCompanySignup } from "../../utility/validation";
 
 
 export default function OnboardingFlow() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    companyName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    companyType: "",
+    address: "",
+  });
 
   const fileInputRef = useRef(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [companyId, setCompanyId] = useState(null);
 
-  const next = () => setStep((s) => Math.min(3, s + 1));
+  const next = () => {
+    setError(null);
+    setSuccessMessage(null);
+    setStep((s) => Math.min(3, s + 1));
+  };
+
   const prev = () => setStep((s) => Math.max(1, s - 1));
 
   const openUpload = () => fileInputRef.current.click();
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) setPreview(URL.createObjectURL(file));
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        setError("Please upload a valid image file");
+        return;
+      }
 
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("File size must be less than 5MB");
+        return;
+      }
+
+      setLogoFile(file);
+      setPreview(URL.createObjectURL(file));
+      setError(null);
+    }
+  };
+
+  // Handle input changes
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+    setError(null);
+  };
+
+  // Handle Step 1 form submission with Axios
+  const handleStep1Submit = async (e) => {
+    e.preventDefault();
+
+    const validation = validateCompanySignup(formData);
+    if (!validation.isValid) {
+      setError(validation.error);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const signupData = {
+        companyName: formData.companyName.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        companyType: formData.companyType,
+        address: formData.address.trim(),
+      };
+
+      // Make API call using Axios
+      const response = await axios.post(`${BASE_URL}/company/signup`, signupData);
+
+      if (response.status === 201 && response.data) {
+        const { token, company } = response.data;
+
+        // Save token and company info to localStorage
+        if (token) {
+          localStorage.setItem("token", token);
+          localStorage.setItem("companyId", company._id);
+          localStorage.setItem("companyName", company.companyName);
+          localStorage.setItem("companyEmail", company.email);
+          setCompanyId(company._id);
+        }
+
+        setSuccessMessage("Company registered successfully!");
+        setLoading(false);
+
+        // Move to next step after short delay
+        setTimeout(() => {
+          next();
+        }, 1000);
+      }
+    } catch (err) {
+      setLoading(false);
+      console.error("Signup error:", err);
+
+      // Handle different error types
+      if (err.response) {
+        // Server responded with error status
+        const errorMessage = err.response.data?.msg || err.response.data?.message || "Server error occurred";
+        setError(errorMessage);
+      } else if (err.request) {
+        // Request was made but no response received
+        setError("No response from server. Please check your connection.");
+      } else {
+        // Error in request setup
+        setError(err.message || "An error occurred during signup");
+      }
+    }
   };
 
   return (
-    <div className="h-screen overflow-hidden flex items-center justify-center bg-[#E8EDFF] p-4 font-inter">
+    <div className="min-h-screen overflow-y-auto flex items-center justify-center bg-[#E8EDFF] p-4 font-inter py-6">
       
       {/* Animation Wrapper */}
       <motion.div
@@ -55,12 +168,25 @@ export default function OnboardingFlow() {
               </p>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="max-w-3xl mx-auto mb-6 p-4 bg-red-50 border border-red-200 rounded-[20px] text-red-700 text-sm flex items-center gap-3">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {successMessage && (
+              <div className="max-w-3xl mx-auto mb-6 p-4 bg-green-50 border border-green-200 rounded-[20px] text-green-700 text-sm flex items-center gap-3">
+                <span>✓</span>
+                <span>{successMessage}</span>
+              </div>
+            )}
+
             {/* FORM */}
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                next();
-              }}
+              onSubmit={handleStep1Submit}
               className="space-y-6 max-w-3xl mx-auto"
             >
               {/* Company Name */}
@@ -70,8 +196,12 @@ export default function OnboardingFlow() {
                 </label>
                 <input
                   type="text"
+                  name="companyName"
                   placeholder="Enter Company Name"
-                  className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3]"
+                  value={formData.companyName}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3] disabled:bg-gray-100 disabled:cursor-not-allowed transition"
                 />
               </div>
 
@@ -82,8 +212,12 @@ export default function OnboardingFlow() {
                 </label>
                 <input
                   type="email"
+                  name="email"
                   placeholder="Enter Company Email"
-                  className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3]"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3] disabled:bg-gray-100 disabled:cursor-not-allowed transition"
                 />
               </div>
 
@@ -95,8 +229,12 @@ export default function OnboardingFlow() {
                   </label>
                   <input
                     type="password"
+                    name="password"
                     placeholder="Enter Password"
-                    className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3]"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3] disabled:bg-gray-100 disabled:cursor-not-allowed transition"
                   />
                 </div>
 
@@ -106,8 +244,12 @@ export default function OnboardingFlow() {
                   </label>
                   <input
                     type="password"
+                    name="confirmPassword"
                     placeholder="Re-Enter Password"
-                    className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3]"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    className="w-full border border-gray-300 rounded-[30px] px-5 py-3 focus:ring-2 focus:ring-[#20A4F3] disabled:bg-gray-100 disabled:cursor-not-allowed transition"
                   />
                 </div>
               </div>
@@ -119,11 +261,21 @@ export default function OnboardingFlow() {
                 </label>
 
                 <div className="relative">
-                  <select className="w-full border border-gray-300 rounded-[30px] px-5 py-3 appearance-none focus:ring-2 focus:ring-[#20A4F3]">
-                    <option>Select Company Type</option>
-                    <option>IT</option>
-                    <option>Finance</option>
-                    <option>Manufacturing</option>
+                  <select
+                    name="companyType"
+                    value={formData.companyType}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                    className="w-full border border-gray-300 rounded-[30px] px-5 py-3 appearance-none focus:ring-2 focus:ring-[#20A4F3] disabled:bg-gray-100 disabled:cursor-not-allowed transition"
+                  >
+                    <option value="">Select Company Type</option>
+                    <option value="IT">IT</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                    <option value="Other">Other</option>
                   </select>
 
                   <ChevronDown
@@ -139,15 +291,26 @@ export default function OnboardingFlow() {
                   Company Address *
                 </label>
                 <textarea
+                  name="address"
                   rows={3}
                   placeholder="Enter Company Address"
-                  className="w-full border border-gray-300 rounded-[22px] px-5 py-3 resize-none focus:ring-2 focus:ring-[#20A4F3]"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  className="w-full border border-gray-300 rounded-[22px] px-5 py-3 resize-none focus:ring-2 focus:ring-[#20A4F3] disabled:bg-gray-100 disabled:cursor-not-allowed transition"
                 />
               </div>
 
               {/* Checkbox */}
               <div className="flex items-center space-x-2">
-                <input type="checkbox" className="h-4 w-4" />
+                <input
+                  type="checkbox"
+                  name="newsletter"
+                  checked={formData.newsletter}
+                  onChange={handleInputChange}
+                  disabled={loading}
+                  className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
+                />
                 <span className="text-gray-600">
                   Get exciting offers on mail
                 </span>
@@ -155,8 +318,22 @@ export default function OnboardingFlow() {
 
               {/* Continue Button */}
               <div className="flex justify-center pt-4">
-                <button className="bg-[#20A4F3] text-white font-semibold px-12 py-3 rounded-[30px]">
-                  Continue
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-[#20A4F3] text-white font-semibold px-12 py-3 rounded-[30px] hover:bg-[#1a8bd1] disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 min-w-[200px]"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Registering...
+                    </span>
+                  ) : (
+                    "Continue"
+                  )}
                 </button>
               </div>
             </form>
@@ -239,11 +416,36 @@ export default function OnboardingFlow() {
               Account created successfully!
             </h2>
 
-            <p className="text-gray-500 text-center max-w-lg mb-10">
+            <p className="text-gray-500 text-center max-w-lg mb-6">
               Welcome aboard! Start your success journey with TaskFleet!
             </p>
 
-            <button className="bg-[#20A4F3] text-white px-10 py-3 rounded-[30px] font-semibold"
+            {/* Company ID Display */}
+            {companyId && (
+              <div className="bg-blue-50 border-2 border-[#20A4F3] rounded-[20px] p-6 mb-8 w-full max-w-md">
+                <p className="text-sm text-gray-600 mb-2 text-center">Your Company ID</p>
+                <div className="flex items-center justify-center gap-3">
+                  <p className="text-2xl font-bold text-[#20A4F3] tracking-wider">
+                    {companyId}
+                  </p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(companyId);
+                      alert("Company ID copied to clipboard!");
+                    }}
+                    className="text-[#20A4F3] hover:bg-blue-100 p-2 rounded-lg transition"
+                    title="Copy Company ID"
+                  >
+                    📋
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  Share this ID with your employees to join your organization
+                </p>
+              </div>
+            )}
+
+            <button className="bg-[#20A4F3] text-white px-10 py-3 rounded-[30px] font-semibold hover:bg-[#1a8bd1] transition-colors"
               onClick={() => navigate("/")}
             >
               Let's Start!
