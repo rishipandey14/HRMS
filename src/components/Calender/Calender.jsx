@@ -142,7 +142,6 @@ const Calender = () => {
     { id: '3', title: 'Hackathon', date: '2025-07-25' }
   ]);
 
-  console.log("events 😍😍😍" , events);
   
 
   // For Modal

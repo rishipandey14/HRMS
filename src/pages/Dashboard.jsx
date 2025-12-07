@@ -75,7 +75,6 @@ const Dashboard = () => {
         }
       );
       
-      alert('Project created successfully!');
       setShowProjectModal(false);
       setProjectForm({
         title: '',
@@ -87,7 +86,6 @@ const Dashboard = () => {
       // Optionally refresh projects list here
     } catch (error) {
       console.error('Error creating project:', error);
-      alert(error.response?.data?.error || 'Failed to create project');
     }
   };
 

@@ -23,9 +23,6 @@ const AssignTask = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    alert(
-      `Task Assigned: ${taskName}\nDescription: ${description}\nEmployee: ${selectedEmployee}\nStart: ${startDate}\nEnd: ${endDate}`
-    );
     setTaskName("");
     setDescription("");
     setStartDate("");

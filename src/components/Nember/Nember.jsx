@@ -44,9 +44,6 @@ export default function Nember() {
         setMembers(mappedUsers);
       } catch (error) {
         console.error('Error fetching company users:', error);
-        console.error('BASE_URL:', BASE_URL);
-        console.error('Token exists:', !!localStorage.getItem('token'));
-        alert(`Failed to load team members. API URL: ${BASE_URL}`);
       } finally {
         setLoading(false);
       }

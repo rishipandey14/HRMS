@@ -25,7 +25,6 @@ const SubmitPopup = ({ isOpen, onClose, title }) => {
   };
 
   const handleFinalConfirm = () => {
-    alert("Submitted Successfully!");
     setOpenConfirmPopup(false);
     onClose(); // close whole popup
     setDescription("");

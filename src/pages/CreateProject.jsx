@@ -42,7 +42,6 @@ const CreateProject = () => {
   // -------- Form Submit --------
   const handleSubmit = (e) => {
     e.preventDefault();
-    alert(`Project Created: ${projectName}\nDescription: ${description}`);
     setProjectName("");
     setDescription("");
   };

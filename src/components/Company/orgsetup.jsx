@@ -431,7 +431,6 @@ export default function OnboardingFlow() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(companyId);
-                      alert("Company ID copied to clipboard!");
                     }}
                     className="text-[#20A4F3] hover:bg-blue-100 p-2 rounded-lg transition"
                     title="Copy Company ID"

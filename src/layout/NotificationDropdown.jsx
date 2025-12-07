@@ -20,16 +20,13 @@ export default function NotificationDropdown({ isOpen, onClose }) {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      console.log('Fetching notifications with token:', token ? 'Token exists' : 'No token');
       const res = await axios.get(BASE_URL + "/notifications", {
         headers: { Authorization: `Bearer ${token}` },
         withCredentials: true
       });
-      console.log('Notifications response:', res.data);
       setNotifications(res.data.notifications || []);
     } catch (error) {
       console.error("Error fetching notifications:", error);
-      console.error("Error response:", error.response?.data);
     } finally {
       setLoading(false);
     }
@@ -65,7 +62,6 @@ export default function NotificationDropdown({ isOpen, onClose }) {
       fetchNotifications();
     } catch (error) {
       console.error("Error handling approval:", error);
-      alert(error.response?.data?.msg || "Failed to process request");
     }
   };
 
