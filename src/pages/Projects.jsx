@@ -2,6 +2,7 @@
 
 import { Plus, Eye, MessageCircle } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import axios from "axios"
 import { BASE_URL } from "../utility/Config"
 
@@ -41,7 +42,7 @@ const colors = {
 }
 
 // ProjectCard Component
-function ProjectCard({ project }) {
+function ProjectCard({ project, onViewClick }) {
   const getPriorityStyles = (priority) => {
     switch (priority.toLowerCase()) {
       case "important":
@@ -85,6 +86,7 @@ function ProjectCard({ project }) {
   return (
     <div
       className="mb-1 rounded-3xl border p-4 transition-all hover:-translate-y-px hover:bg-white cursor-pointer"
+      onClick={() => onViewClick(project._id)}
       style={{
         borderColor: colors.borderCard,
         backgroundColor: colors.bgCard,
@@ -152,7 +154,7 @@ function ProjectCard({ project }) {
 }
 
 // ProjectColumn Component
-function ProjectColumn({ title, count, projects, type, isAdminPanelOpen, isUserPanelOpen }) {
+function ProjectColumn({ title, count, projects, type, isAdminPanelOpen, isUserPanelOpen, onProjectClick }) {
   const statusIndicatorColor =
     type === "pending" ? colors.progressPending : type === "progress" ? colors.progressActive : colors.progressCompleted
 
@@ -194,7 +196,7 @@ function ProjectColumn({ title, count, projects, type, isAdminPanelOpen, isUserP
       </div>
       <div className="column-content flex flex-1 flex-col gap-4 overflow-y-auto pr-1">
         {projects.map((project) => (
-          <ProjectCard key={project.id} project={project} />
+          <ProjectCard key={project._id || project.id} project={project} onViewClick={onProjectClick} />
         ))}
       </div>
     </div>
@@ -203,126 +205,19 @@ function ProjectColumn({ title, count, projects, type, isAdminPanelOpen, isUserP
 
 // Main ProjectsView Component
 export default function ProjectsView() {
+  const navigate = useNavigate();
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isUserPanelOpen, setIsUserPanelOpen] = useState(true);
   const [pendingProjectsApi, setPendingProjectsApi] = useState([]);
   const [inProgressProjectsApi, setInProgressProjectsApi] = useState([]);
   const [completedProjectsApi, setCompletedProjectsApi] = useState([]);
   const [loading, setLoading] = useState(true);
-  // Static dataset (kept as requested). Using API below for live data.
-  // const pendingProjects = [
-  //   {
-  //     id: 1,
-  //     title: "UI/UX Design in the age of AI",
-  //     priority: "Important",
-  //     progress: 0,
-  //     status: "pending",
-  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-  //     stats: { views: 11, comments: 187 },
-  //   },
-  //   {
-  //     id: 2,
-  //     title: "Responsive Website Design for 23 more clients",
-  //     priority: "Meh",
-  //     progress: 0,
-  //     status: "pending",
-  //     team: [
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //     ],
-  //     stats: { views: 32, comments: 115 },
-  //   },
-  //   {
-  //     id: 3,
-  //     title: "Blog Copywriting (Low priority 😴)",
-  //     priority: "OK",
-  //     progress: 0,
-  //     status: "pending",
-  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-  //     stats: { views: 987, comments: 21800 },
-  //   },
-  //   {
-  //     id: 4,
-  //     title: "Landing page for Azunyan senpai",
-  //     priority: "Not that important",
-  //     progress: 0,
-  //     status: "pending",
-  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-  //     stats: { views: 0, comments: 0 },
-  //   },
-  // ]
-  // const inProgressProjects = [
-  //   {
-  //     id: 5,
-  //     title: "Machine Learning Progress",
-  //     priority: "Important",
-  //     progress: 52,
-  //     status: "progress",
-  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-  //     stats: { views: 11, comments: 187 },
-  //   },
-  //   {
-  //     id: 6,
-  //     title: "Learn Computer Science",
-  //     priority: "Meh",
-  //     progress: 30,
-  //     status: "progress",
-  //     team: [
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //     ],
-  //     stats: { views: 32, comments: 115 },
-  //   },
-  // ]
-  // const completedProjects = [
-  //   {
-  //     id: 7,
-  //     title: "User flow confirmation for fintech App",
-  //     priority: "Important",
-  //     progress: 100,
-  //     status: "completed",
-  //     team: ["/placeholder.svg?height=24&width=24", "/placeholder.svg?height=24&width=24"],
-  //     stats: { views: 11, comments: 2200 },
-  //   },
-  //   {
-  //     id: 8,
-  //     title: "Do some usual chores",
-  //     priority: "High Priority",
-  //     progress: 100,
-  //     status: "completed",
-  //     team: [
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //     ],
-  //     stats: { views: 1, comments: 87 },
-  //   },
-  //   {
-  //     id: 9,
-  //     title: "Write a few articles for slothUI",
-  //     priority: "",
-  //     progress: 100,
-  //     status: "completed",
-  //     team: ["/placeholder.svg?height=24&width=24"],
-  //     stats: { views: 987, comments: 21800 },
-  //   },
-  //   {
-  //     id: 10,
-  //     title: "Transform into a cyborg",
-  //     priority: "OK",
-  //     progress: 100,
-  //     status: "completed",
-  //     team: [
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //       "/placeholder.svg?height=24&width=24",
-  //     ],
-  //     stats: { views: 987, comments: 21800 },
-  //   },
-  // ]
+
+  // Handle project click to navigate to project details
+  const handleProjectClick = (projectId) => {
+    
+    navigate(`/projects/${projectId}`);
+  };
 
   // Decode token role and fetch projects for the company
   useEffect(() => {
@@ -367,6 +262,7 @@ export default function ProjectsView() {
   const categorizeProjects = (projects) => {
     const now = new Date();
     const toCard = (p) => ({
+      _id: p._id,
       id: p._id,
       title: p.title,
       priority: '',
@@ -425,31 +321,29 @@ export default function ProjectsView() {
               </h1>
             </div>
             <div className="grid h-full items-start gap-8 lg:grid-cols-3 md:grid-cols-2 grid-cols-1">
-              <ProjectColumn title="Upcoming" count={pendingProjectsApi.length} projects={pendingProjectsApi} type="Upcoming" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
-              <ProjectColumn title="In Progress" count={inProgressProjectsApi.length} projects={inProgressProjectsApi} type="progress" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
-              <ProjectColumn title="Completed" count={completedProjectsApi.length} projects={completedProjectsApi} type="completed" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} />
+              <ProjectColumn title="Upcoming" count={pendingProjectsApi.length} projects={pendingProjectsApi} type="Upcoming" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} onProjectClick={handleProjectClick} />
+              <ProjectColumn title="In Progress" count={inProgressProjectsApi.length} projects={inProgressProjectsApi} type="progress" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} onProjectClick={handleProjectClick} />
+              <ProjectColumn title="Completed" count={completedProjectsApi.length} projects={completedProjectsApi} type="completed" isAdminPanelOpen={isAdminPanelOpen} isUserPanelOpen={isUserPanelOpen} onProjectClick={handleProjectClick} />
             </div>
           </div>
         </main>
       </div>
-      <style jsx>{`
+      <style>{`
         .column-content::-webkit-scrollbar {
           width: 6px;
-          background-color: transparent; /* Make the track transparent */
+          background-color: transparent;
         }
         .column-content::-webkit-scrollbar-thumb {
-          background-color: rgba(0, 0, 0, 0.1); /* Subtle grey thumb */
+          background-color: rgba(0, 0, 0, 0.1);
           border-radius: 3px;
         }
         .column-content::-webkit-scrollbar-thumb:hover {
-          background-color: rgba(0, 0, 0, 0.2); /* Slightly darker on hover */
+          background-color: rgba(0, 0, 0, 0.2);
         }
         .column-content {
-          scrollbar-width: thin; /* Firefox */
-          scrollbar-color: rgba(0, 0, 0, 0.1) transparent; /* Firefox: thumb color track color */
+          scrollbar-width: thin;
+          scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
         }
-      `}</style>
-      <style jsx global>{`
         .transparent-scrollbar::-webkit-scrollbar {
           width: 8px;
           background: transparent;

@@ -37,7 +37,7 @@ function App() {
       >
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
-        <Route path="projects/view" element={<ProjectPage />} />
+        <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="chat" element={<Chat />} />
         <Route path="team" element={<Team />} />
