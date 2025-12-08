@@ -126,12 +126,23 @@ export default function Nember() {
                   setOpenViewProfile(true); // OPEN POPUP
                 }}
               >
+              {/* ⭐ UPDATED VIEW PROFILE BUTTON ⭐ */}
+              <button
+                className="bg-blue-500 text-white w-full text-xs py-3 px-3 rounded-b-2xl hover:bg-blue-600"
+                onClick={() => {
+                  setSelectedMember(member);
+                  setOpenViewProfile(true); // OPEN POPUP
+                }}
+              >
                 View Profile
               </button>
 
               {isAdmin && (
                 <div className="absolute top-2 right-2">
                   <button
+                    onClick={() =>
+                      setOpenMenuIndex((cur) => (cur === index ? null : index))
+                    }
                     onClick={() =>
                       setOpenMenuIndex((cur) => (cur === index ? null : index))
                     }
@@ -178,6 +189,7 @@ export default function Nember() {
         </div>
       </div>
 
+      {/* Existing EDIT MODAL (UNTOUCHED) */}
       {/* Existing EDIT MODAL (UNTOUCHED) */}
       {openEditModal && selectedMember && (
         <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/30 backdrop-blur-sm">
@@ -245,6 +257,19 @@ export default function Nember() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ⭐ NEW VIEW PROFILE POPUP ⭐ */}
+      {openViewProfile && selectedMember && (
+  <ViewProfile
+    isOpen={openViewProfile}
+    data={{
+      ...selectedMember,
+      img: `https://i.pravatar.cc/150?img=${selectedMember.img}`,
+    }}
+    onClose={() => setOpenViewProfile(false)}
+  />
+)}
       )}
 
       {/* ⭐ NEW VIEW PROFILE POPUP ⭐ */}
