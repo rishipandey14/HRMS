@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import axios from "axios";
+import { useParams } from "react-router-dom";
 import { BASE_URL } from "../../utility/Config";
 import ViewProfile from "../Basic/viewprofile"; // ✅ IMPORT VIEW PROFILE POPUP
 
-export default function Nember() {
+export default function Nember({ projectId: propProjectId }) {
+  const { projectId: paramProjectId } = useParams();
+  const projectId = propProjectId || paramProjectId; // Use prop if available, else from URL params
+  
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openMenuIndex, setOpenMenuIndex] = useState(null);
@@ -12,45 +16,65 @@ export default function Nember() {
   const [selectedMember, setSelectedMember] = useState(null);
   const [openViewProfile, setOpenViewProfile] = useState(false);
 
-  // Fetch company users from API
+  // Fetch project members or company users based on projectId
   useEffect(() => {
-    const fetchCompanyUsers = async () => {
+    const fetchMembers = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${BASE_URL}/company/users`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
         
-        // Map API response to component structure
-        const usersData = response.data.users || response.data || [];
+        let endpoint = `${BASE_URL}/company/users`;
+        const params = {};
+        
+        // If projectId is available, filter by project participants
+        if (projectId) {
+          endpoint = `${BASE_URL}/projects/${projectId}`;
+        }
+        
+        const response = await axios.get(endpoint, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: Object.keys(params).length > 0 ? params : undefined
+        });
+
+        let usersData = [];
+        
+        // Handle different response formats
+        if (projectId && response.data.participants) {
+          // If fetching project, participants is an array of user IDs
+          usersData = response.data.participants || [];
+        } else if (response.data.users) {
+          // If fetching company users
+          usersData = response.data.users || [];
+        } else if (Array.isArray(response.data)) {
+          usersData = response.data;
+        }
         
         if (!Array.isArray(usersData)) {
-          console.error('Invalid API response format:', response.data);
           setMembers([]);
           return;
         }
         
         const mappedUsers = usersData.map((user, idx) => ({
-          name: user.name,
-          email: user.email,
+          name: user.name || user,
+          email: user.email || 'N/A',
           img: (idx % 70) + 1, // Random avatar
-          role: user.role === 'user' ? 'Employee' : user.role,
+          role: user.role === 'user' ? 'Employee' : (user.role || 'N/A'),
           phone: user.mobile || 'N/A',
-          joined: new Date(user.createdAt).toLocaleDateString('en-GB'),
-          _id: user._id
+          joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB') : 'N/A',
+          _id: user._id || user
         }));
         
         setMembers(mappedUsers);
       } catch (error) {
-        console.error('Error fetching company users:', error);
+        console.error('Error fetching members:', error);
+        setMembers([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCompanyUsers();
-  }, []);
+    fetchMembers();
+  }, [projectId]);
 
   // close dropdown when click outside current menu/button
   useEffect(() => {
@@ -126,23 +150,12 @@ export default function Nember() {
                   setOpenViewProfile(true); // OPEN POPUP
                 }}
               >
-              {/* ⭐ UPDATED VIEW PROFILE BUTTON ⭐ */}
-              <button
-                className="bg-blue-500 text-white w-full text-xs py-3 px-3 rounded-b-2xl hover:bg-blue-600"
-                onClick={() => {
-                  setSelectedMember(member);
-                  setOpenViewProfile(true); // OPEN POPUP
-                }}
-              >
                 View Profile
               </button>
 
               {isAdmin && (
                 <div className="absolute top-2 right-2">
                   <button
-                    onClick={() =>
-                      setOpenMenuIndex((cur) => (cur === index ? null : index))
-                    }
                     onClick={() =>
                       setOpenMenuIndex((cur) => (cur === index ? null : index))
                     }
@@ -189,7 +202,6 @@ export default function Nember() {
         </div>
       </div>
 
-      {/* Existing EDIT MODAL (UNTOUCHED) */}
       {/* Existing EDIT MODAL (UNTOUCHED) */}
       {openEditModal && selectedMember && (
         <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/30 backdrop-blur-sm">
@@ -257,19 +269,6 @@ export default function Nember() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* ⭐ NEW VIEW PROFILE POPUP ⭐ */}
-      {openViewProfile && selectedMember && (
-  <ViewProfile
-    isOpen={openViewProfile}
-    data={{
-      ...selectedMember,
-      img: `https://i.pravatar.cc/150?img=${selectedMember.img}`,
-    }}
-    onClose={() => setOpenViewProfile(false)}
-  />
-)}
       )}
 
       {/* ⭐ NEW VIEW PROFILE POPUP ⭐ */}
