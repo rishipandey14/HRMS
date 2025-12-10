@@ -1,64 +1,147 @@
-import React from "react";
-import { IoClose } from "react-icons/io5";
+import React, { useState } from "react";
+import Pagination from "../Basic/pagination";   // ⭐ Your required import
 
-const PopupCard = ({ isOpen, onClose, data }) => {
-  if (!isOpen) return null;
+const mockProjects = Array.from({ length: 50 }, (_, i) => ({
+  id: i + 1,
+  description: "Wireframe Design",
+  startDate: "15 Jun 2025",
+  dueDate: "15 Aug 2025",
+  status: i % 3 === 0 ? "Completed" : i % 3 === 1 ? "In Progress" : "Pending",
+}));
+
+const statusColors = {
+  Completed: "bg-green-100 text-green-600 border-green-400",
+  "In Progress": "bg-yellow-100 text-yellow-700 border-yellow-400",
+  Pending: "bg-red-100 text-red-500 border-red-400",
+};
+
+export default function ProfilePage() {
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const filteredProjects = mockProjects.filter((p) =>
+    p.description.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
+
+  const paginated = filteredProjects.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage
+  );
 
   return (
-    <div className="absolute top-0 left-0 right-0 mx-auto mt-20 z-50 flex justify-center">
-      <div className="bg-white rounded-2xl shadow-xl w-[420px] p-6 relative border">
+    <div className="w-full min-h-screen bg-gray-100 flex justify-center px-4 py-6">
+      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-lg p-6">
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-600 hover:text-black text-xl"
-        >
-          <IoClose />
-        </button>
-
-        {/* User Info */}
-        <div className="flex items-center gap-4">
+        {/* ----- Profile Header ----- */}
+        <div className="flex flex-col md:flex-row md:items-center gap-6 border-b pb-6">
           <img
-            src={data.img}
-            alt={data.name}
-            className="w-16 h-16 rounded-full object-cover"
+            src="https://i.ibb.co/2d3Fb25/avatar.png"
+            className="w-20 h-20 rounded-full"
+            alt="avatar"
           />
 
-          <div>
-            <h2 className="text-xl font-semibold">{data.name}</h2>
-            <p className="text-gray-500 text-sm">{data.role}</p>
+          <div className="flex-grow">
+            <h2 className="text-2xl font-semibold">Mohan Kumar</h2>
+            <p className="text-gray-500">Product Manager</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button className="bg-blue-500 text-white px-4 py-2 rounded-lg">
+              Chat
+            </button>
+            <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
+              Email
+            </button>
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="h-[1px] bg-gray-200 my-4"></div>
+        {/* Joined Date */}
+        <div className="text-right text-gray-500 text-sm mt-2 mb-8">
+          Date Joined: <span className="font-semibold">12-02-2025</span>
+        </div>
 
-        {/* Email & Phone */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Details */}
+        <div className="grid md:grid-cols-2 gap-6 border p-6 rounded-xl">
           <div>
-            <p className="text-xs text-gray-500">Email Address</p>
-            <p className="text-sm font-medium">{data.email}</p>
+            <p className="text-gray-500 text-sm">Full Name</p>
+            <p className="font-semibold">Mohan Kumar</p>
           </div>
 
           <div>
-            <p className="text-xs text-gray-500">Phone Number</p>
-            <p className="text-sm font-medium">{data.phone}</p>
+            <p className="text-gray-500 text-sm">Email Address</p>
+            <p className="font-semibold">Mohan@taskfleet.com</p>
+          </div>
+
+          <div>
+            <p className="text-gray-500 text-sm">Phone Number</p>
+            <p className="font-semibold">+91 62661 65883</p>
+          </div>
+
+          <div>
+            <p className="text-gray-500 text-sm">Job Title</p>
+            <p className="font-semibold">Product Manager</p>
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="flex justify-between mt-6">
-          <button className="w-[45%] py-3 rounded-xl border border-blue-400 text-blue-500 hover:bg-blue-50 transition">
-            Email
-          </button>
-          <button className="w-[45%] py-3 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition">
-            Chat
-          </button>
+        {/* Projects Header */}
+        <div className="mt-10 flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Projects</h3>
+
+          <input
+            type="text"
+            placeholder="Search Projects"
+            className="border rounded-xl px-4 py-1 text-sm"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
         </div>
 
+        {/* Table */}
+        <div className="overflow-x-auto mt-4">
+          <table className="w-full border rounded-xl overflow-hidden">
+            <thead className="bg-gray-200 text-gray-600">
+              <tr>
+                <th className="p-3 text-left">Description</th>
+                <th className="p-3 text-left">Start Date</th>
+                <th className="p-3 text-left">Due Date</th>
+                <th className="p-3 text-left">Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginated.map((row) => (
+                <tr key={row.id} className="border-b">
+                  <td className="p-3">{row.description}</td>
+                  <td className="p-3">{row.startDate}</td>
+                  <td className="p-3">{row.dueDate}</td>
+                  <td className="p-3">
+                    <span
+                      className={`px-3 py-1 border rounded-full text-sm ${statusColors[row.status]}`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ----- Pagination Component (Imported) ----- */}
+        <div className="mt-6 flex justify-center">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
+        </div>
       </div>
     </div>
   );
-};
-
-export default PopupCard;
+}
