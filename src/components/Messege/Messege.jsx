@@ -1,210 +1,516 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import axios from "axios";
+import { io } from "socket.io-client";
 import { Send, Plus } from "lucide-react";
+import { CHAT_BASE_URL, BASE_URL } from "../../utility/Config";
 
-const messages = [
-  { fromMe: false, text: "omg, this is amazing" },
-  { fromMe: false, text: "perfect ✅" },
-  { fromMe: false, text: "Wow, this is really epic" },
-  { fromMe: true, text: "How are you?" },
-  { fromMe: false, text: "just ideas for next time" },
-  { fromMe: false, text: "i'll be there in 2 mins💗" },
-  { fromMe: true, text: "woohoooo" },
-  { fromMe: true, text: "Haha oh man" },
-  { fromMe: true, text: "Haha that’s terrifying 😅" },
-  { fromMe: false, text: "aww" },
-  { fromMe: false, text: "omg, this is amazing" },
-  { fromMe: false, text: "woohoooo 🔥" },
-];
-
-const contacts = [
-  {
-    name: "Elmer Laverty",
-    time: "12m",
-    tags: ["Question", "Help wanted"],
-    img: 1,
-  },
-  {
-    name: "Florencio Dorrance",
-    time: "24h",
-    tags: ["Some content"],
-    img: 2,
-    active: true,
-  },
-  { name: "Lavern Laboy", time: "1h", tags: ["Bug", "Hacktoberfest"], img: 3 },
-  {
-    name: "Titus Kitamura",
-    time: "5h",
-    tags: ["Question", "Some content"],
-    img: 4,
-  },
-  { name: "Geoffrey Mott", time: "2d", tags: ["Request"], img: 5 },
-  { name: "Alfonzo Schuessler", time: "1m", tags: ["Follow up"], img: 6 },
-];
+const parseToken = (token) => {
+  try {
+    const payload = token?.split(".")[1];
+    return payload ? JSON.parse(atob(payload)) : null;
+  } catch (err) {
+    return null;
+  }
+};
 
 const Messege = () => {
+  const [chats, setChats] = useState([]);
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loadingChats, setLoadingChats] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const socketRef = useRef(null);
+
+  const [openNewChat, setOpenNewChat] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [newChatMessage, setNewChatMessage] = useState("");
+  
+  // User cache to avoid repeated API calls - stored in state to trigger re-renders
+  const [userCache, setUserCache] = useState({});
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
+  const decoded = useMemo(() => parseToken(token), [token]);
+  const currentUserId = decoded?.id;
+
+  const authHeader = useMemo(
+    () => ({ headers: { Authorization: `Bearer ${token}` } }),
+    [token]
+  );
+
+  const normalizeUser = (u) => {
+    if (!u) return { _id: "unknown", name: "Unknown" };
+    if (typeof u === "string") return { _id: u, name: u };
+    return { _id: u._id || u.id, name: u.name || u.email || "Unknown", email: u.email };
+  };
+
+  // Fetch user details from task-tracker and cache them in state
+  const fetchUserDetails = useCallback(async (userId) => {
+    if (!userId || !token) return;
+    
+    // Check cache first
+    if (userCache[userId]) {
+      return;
+    }
+
+    try {
+      // Try to get from company users first
+      const res = await axios.get(`${BASE_URL}/company/users`, authHeader);
+      const users = res.data?.users || [];
+      const found = users.find((u) => u._id === userId || u.id === userId);
+      
+      if (found) {
+        const userData = {
+          _id: found._id || found.id,
+          name: found.name,
+          email: found.email,
+        };
+        
+        // Update state cache
+        setUserCache((prev) => ({ ...prev, [userId]: userData }));
+      }
+    } catch (err) {
+      console.error(`Error fetching user ${userId}:`, err);
+    }
+  }, [token, authHeader, userCache]);
+
+  const contactDisplay = (chat) => {
+    if (chat?.isGroup) {
+      return {
+        title: chat.groupName || `Group (${chat.members?.length || 0})`,
+        subtitle: `${chat.members?.length || 0} members`,
+        avatar: chat.groupAvatar || `https://i.pravatar.cc/150?u=${chat._id}`,
+      };
+    }
+    
+    // Direct chat - get the other person's info from cache
+    const otherMemberId = chat?.members?.find((m) => m !== currentUserId);
+    const otherUserInfo = userCache[otherMemberId] || { name: otherMemberId || "Direct chat", email: "" };
+    
+    return {
+      title: otherUserInfo.name || otherMemberId || "Direct chat",
+      subtitle: otherUserInfo.email || "Direct chat",
+      avatar: `https://i.pravatar.cc/150?u=${otherMemberId || "direct"}`,
+    };
+  };
+
+  const upsertMessage = useCallback((incoming) => {
+    if (!incoming?._id) return;
+    
+    // Cache sender info if it's an object
+    if (incoming.senderId && typeof incoming.senderId === "object") {
+      const senderData = incoming.senderId;
+      const userId = senderData._id || senderData.id;
+      if (userId) {
+        setUserCache((prev) => ({
+          ...prev,
+          [userId]: {
+            _id: userId,
+            name: senderData.name,
+            email: senderData.email,
+          },
+        }));
+      }
+    }
+    
+    setMessages((prev) => {
+      if (prev.some((m) => m._id === incoming._id)) return prev;
+      return [...prev, incoming];
+    });
+  }, []);
+
+  useEffect(() => {
+    const fetchChats = async () => {
+      if (!token) return;
+      setLoadingChats(true);
+      try {
+        const res = await axios.get(`${CHAT_BASE_URL}/api/chats`, authHeader);
+        const list = res.data || [];
+        setChats(list);
+        if (list.length) setSelectedChat(list[0]);
+        
+        // Fetch user details for all members in all chats
+        const allMemberIds = new Set();
+        list.forEach((chat) => {
+          (chat.members || []).forEach((memberId) => {
+            if (memberId && memberId !== currentUserId) {
+              allMemberIds.add(memberId);
+            }
+          });
+        });
+        
+        allMemberIds.forEach((memberId) => {
+          fetchUserDetails(memberId);
+        });
+      } catch (err) {
+        console.error("Error loading chats", err);
+        setChats([]);
+      } finally {
+        setLoadingChats(false);
+      }
+    };
+    fetchChats();
+  }, [token, authHeader, fetchUserDetails, currentUserId]);
+
+  const loadMembers = async () => {
+    if (!token) return;
+    setMembersLoading(true);
+    try {
+      const res = await axios.get(`${BASE_URL}/company/users`, authHeader);
+      const list = res.data?.users || [];
+      setMembers(list);
+    } catch (err) {
+      console.error("Error loading members", err);
+      setMembers([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  // socket connect
+  useEffect(() => {
+    if (!token) return;
+    const socket = io(CHAT_BASE_URL, {
+      auth: { token },
+      transports: ["websocket"],
+    });
+
+    socketRef.current = socket;
+
+    // Register all listeners before emitting connect_user
+    socket.on("connect", () => {
+      console.log("Socket connected");
+      socket.emit("connect_user");
+    });
+
+    socket.on("receive_message", (msg) => {
+      console.log("Received message:", msg);
+      upsertMessage(msg);
+    });
+
+    socket.on("edit_message", (msg) => {
+      console.log("Message edited:", msg);
+      setMessages((prev) => prev.map((m) => (m._id === msg._id ? msg : m)));
+    });
+
+    socket.on("delete_message", (msgId) => {
+      console.log("Message deleted:", msgId);
+      setMessages((prev) => prev.filter((m) => m._id !== msgId));
+    });
+
+    socket.on("error", (err) => {
+      console.error("Socket error:", err);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Socket disconnected");
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [token, upsertMessage]);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!selectedChat?._id) return;
+      setLoadingMessages(true);
+      try {
+        const res = await axios.get(
+          `${CHAT_BASE_URL}/api/messages/${selectedChat._id}`,
+          authHeader
+        );
+        const msgs = res.data || [];
+        setMessages(msgs);
+        
+        // Fetch user details for all senders in messages to populate cache
+        const senderIds = [...new Set(msgs.map((m) => m.senderId).filter(Boolean))];
+        senderIds.forEach((senderId) => {
+          fetchUserDetails(senderId);
+        });
+        
+        // ensure room joined for realtime
+        socketRef.current?.emit("join_chat", selectedChat._id);
+      } catch (err) {
+        console.error("Error loading messages", err);
+        setMessages([]);
+      } finally {
+        setLoadingMessages(false);
+      }
+    };
+    fetchMessages();
+  }, [selectedChat?._id, authHeader, fetchUserDetails]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || !selectedChat?._id) return;
+    const payload = { chatId: selectedChat._id, content: input.trim(), type: "text" };
+    try {
+      // Send via socket only; backend socket handler persists and emits receive_message
+      socketRef.current?.emit("send_message", payload);
+      setInput("");
+    } catch (err) {
+      console.error("Send message failed", err);
+    }
+  };
+
+  const startDirectChat = async () => {
+    if (!selectedUserId) return;
+    const body = {
+      receiverId: selectedUserId,
+      content: newChatMessage.trim() || "Hi",
+      type: "text",
+    };
+    try {
+      const res = await axios.post(`${CHAT_BASE_URL}/api/messages`, body, authHeader);
+      const chatId = res.data?.chatId || res.data?.chat?._id || res.data?.chat || body.chatId;
+      // refresh chats and focus the one with this chatId
+      const chatsRes = await axios.get(`${CHAT_BASE_URL}/api/chats`, authHeader);
+      const list = chatsRes.data || [];
+      setChats(list);
+      const found = list.find((c) => c._id === chatId) || list[0];
+      setSelectedChat(found || null);
+      if (chatId) {
+        const msgs = await axios.get(`${CHAT_BASE_URL}/api/messages/${chatId}`, authHeader);
+        setMessages(msgs.data || []);
+      }
+      setOpenNewChat(false);
+      setNewChatMessage("");
+      setSelectedUserId("");
+    } catch (err) {
+      console.error("Start chat failed", err);
+    }
+  };
+
+  const selectedContact = selectedChat ? contactDisplay(selectedChat) : null;
+
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-3 p-4 sm:px-4  bg-gray-200 shadow rounded-3xl overflow-hidden md:min-w-[900px]">
-      {/* Left: Contacts Section */}
-      <div className="w-full md:w-[400px] md:flex-none p-4   bg-white rounded-3xl flex flex-col max-h-[calc(100vh-120px)] overflow-hidden">
-        {/* Header */}
+    <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-3 p-4 sm:px-4 bg-gray-200 shadow rounded-3xl overflow-hidden md:min-w-[900px]">
+      {/* Left: Contacts */}
+      <div className="w-full md:w-[360px] md:flex-none p-4 bg-white rounded-3xl flex flex-col max-h-[calc(100vh-120px)] overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Messages</h2>
-          <button className="bg-blue-500 p-1 rounded-full text-white">
+          <button
+            className="bg-blue-500 p-1 rounded-full text-white"
+            onClick={() => {
+              setOpenNewChat(true);
+              if (!members.length) loadMembers();
+            }}
+          >
             <Plus size={16} />
           </button>
         </div>
 
-        {/* Search */}
         <input
           type="text"
           placeholder="Search messages"
           className="px-4 py-2 border rounded-full text-sm border-gray-200"
         />
 
-        {/* Contact List */}
         <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-2">
-          {contacts.map((contact, index) => (
-            <div
-              key={index}
-              className={`flex gap-3 items-start p-2 rounded-xl cursor-pointer ${
-                contact.active ? "bg-gray-100" : "hover:bg-gray-50"
-              }`}
-            >
+          {loadingChats && <p className="text-sm text-gray-500">Loading chats...</p>}
+          {!loadingChats && chats.length === 0 && (
+            <p className="text-sm text-gray-500">No chats yet.</p>
+          )}
+          {!loadingChats &&
+            chats.map((chat) => {
+              const info = contactDisplay(chat);
+              const active = selectedChat?._id === chat._id;
+              return (
+                <button
+                  key={chat._id}
+                  onClick={() => setSelectedChat(chat)}
+                  className={`w-full text-left flex gap-3 items-start p-2 rounded-xl cursor-pointer ${
+                    active ? "bg-gray-100" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <img
+                    src={info.avatar}
+                    className="w-10 h-10 rounded-full"
+                    alt={info.title}
+                  />
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center text-sm font-medium">
+                      <span>{info.title}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate">{info.subtitle}</p>
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      </div>
+
+      {/* Right: Chat */}
+      <div className="flex-1 flex rounded-3xl bg-white flex-col max-h-[calc(100vh-120px)] overflow-hidden">
+        {selectedChat ? (
+          <>
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
               <img
-                src={`https://i.pravatar.cc/150?img=${contact.img}`}
+                src={selectedContact?.avatar}
                 className="w-10 h-10 rounded-full"
-                alt={contact.name}
+                alt={selectedContact?.title || "Chat"}
               />
-              <div className="flex-1">
-                <div className="flex justify-between items-center text-sm font-medium">
-                  <span>{contact.name}</span>
-                  <span className="text-xs text-gray-400">{contact.time}</span>
-                </div>
+              <div>
+                <h2 className="font-medium">{selectedContact?.title}</h2>
+                <p className="text-xs text-gray-500">{selectedContact?.subtitle}</p>
+              </div>
+            </div>
 
-                {/* Colored Tags */}
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {contact.tags.map((tag, idx) => {
-                    let bg = "bg-gray-100";
-                    let text = "text-gray-600";
+            <div className="flex-1 px-4 sm:px-6 py-4 overflow-y-auto bg-white">
+              {loadingMessages && (
+                <p className="text-sm text-gray-500">Loading messages...</p>
+              )}
+              {!loadingMessages && messages.length === 0 && (
+                <p className="text-sm text-gray-500">No messages yet.</p>
+              )}
+              {!loadingMessages &&
+                messages.map((msg) => {
+                  const senderId = msg.senderId;
+                  const senderInfo = userCache[senderId] || { _id: senderId, name: "Loading..." };
+                  const fromMe = senderId === currentUserId;
+                  const avatar = `https://i.pravatar.cc/150?u=${senderId}`;
+                  return (
+                    <div
+                      key={msg._id}
+                      className={`flex items-end gap-1 mb-3 ${
+                        fromMe ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      {!fromMe && (
+                        <img src={avatar} className="w-6 h-6 rounded-full flex-shrink-0" alt={senderInfo.name} title={senderInfo.email || senderInfo.name} />
+                      )}
+                      <div className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}>
+                        {selectedChat?.isGroup && !fromMe && (
+                          <p className="text-xs text-gray-500 px-3 mb-1">{senderInfo.name}</p>
+                        )}
+                        <div
+                          className={`text-sm px-3 py-1.5 rounded-xl ${
+                            fromMe
+                              ? "bg-blue-500 text-white rounded-br-none"
+                              : "bg-gray-100 text-black rounded-bl-none"
+                          }`}
+                          title={senderInfo.email || senderInfo.name}
+                        >
+                          {msg.content || msg.text}
+                        </div>
+                      </div>
+                      {fromMe && (
+                        <img src={avatar} className="w-6 h-6 rounded-full flex-shrink-0" alt="You" title="You" />
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
 
-                    switch (tag) {
-                      case "Question":
-                        bg = "bg-yellow-100";
-                        text = "text-yellow-800";
-                        break;
-                      case "Help wanted":
-                        bg = "bg-green-100";
-                        text = "text-green-800";
-                        break;
-                      case "Bug":
-                        bg = "bg-red-100";
-                        text = "text-red-800";
-                        break;
-                      case "Hacktoberfest":
-                        bg = "bg-emerald-100";
-                        text = "text-emerald-800";
-                        break;
-                      case "Some content":
-                        bg = "bg-blue-100";
-                        text = "text-blue-800";
-                        break;
-                      case "Request":
-                        bg = "bg-green-100";
-                        text = "text-green-800";
-                        break;
-                      case "Follow up":
-                        bg = "bg-purple-100";
-                        text = "text-purple-800";
-                        break;
-                      default:
-                        break;
+            <div className="p-4 border-t border-gray-200">
+              <div className="flex bg-gray-100 rounded-full px-4 py-2">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Type a message"
+                  className="flex-1 bg-transparent outline-none text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      sendMessage();
                     }
-
-                    return (
-                      <span
-                        key={idx}
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${bg} ${text}`}
-                      >
-                        {tag}
-                      </span>
-                    );
-                  })}
-                </div>
+                  }}
+                />
+                <button className="text-blue-500" onClick={sendMessage}>
+                  <Send className="w-5 h-5" />
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <div className="flex flex-1 items-center justify-center text-gray-500 text-sm">
+            Select a chat to start messaging.
+          </div>
+        )}
       </div>
 
-      {/* Right: Chat Section */}
-      <div className="flex-1 flex   rounded-3xl bg-white flex-col max-h-[calc(100vh-120px)] overflow-hidden">
-        {/* Chat Header */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
-          <img
-            src="https://i.pravatar.cc/150?img=2"
-            className="w-10 h-10 rounded-full"
-            alt=""
-          />
-          <div>
-            <h2 className="font-medium">Florencio Dorrance</h2>
-            <p className="text-xs text-green-500">● Online</p>
-          </div>
-        </div>
+      {/* New Chat Modal */}
+      {openNewChat && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[200] px-4">
+          <div className="bg-white rounded-3xl w-full max-w-xl p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Start a new chat</h3>
+              <button onClick={() => setOpenNewChat(false)} className="text-gray-500 hover:text-black">
+                ✕
+              </button>
+            </div>
 
-        {/* Messages */}
-        <div className="flex-1 px-4 sm:px-6 py-4 overflow-y-auto bg-white">
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`flex items-center gap-1 mb-1 ${
-                msg.fromMe ? "justify-end" : "justify-start"
-              }`}
-            >
-              {!msg.fromMe && (
-                <img
-                  src="https://i.pravatar.cc/150?img=2"
-                  className="w-6 h-6 rounded-full"
-                  alt=""
-                />
-              )}
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Search by name or email"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className="w-full px-3 py-2 border rounded-xl text-sm"
+              />
 
-              {/* Message Bubble */}
-              <div
-                className={`text-sm px-3 py-1.5 rounded-xl ${
-                  msg.fromMe
-                    ? "bg-blue-500 text-white rounded-br-none"
-                    : "bg-gray-100 text-black rounded-bl-none"
-                }`}
-              >
-                {msg.text}
+              <div className="max-h-56 overflow-y-auto border rounded-2xl divide-y">
+                {membersLoading && <p className="p-3 text-sm text-gray-500">Loading members...</p>}
+                {!membersLoading && members
+                  .filter((m) =>
+                    `${m.name || ""} ${m.email || ""}`
+                      .toLowerCase()
+                      .includes(memberSearch.toLowerCase())
+                  )
+                  .map((m) => (
+                    <label
+                      key={m._id}
+                      className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50"
+                    >
+                      <input
+                        type="radio"
+                        name="new-chat-user"
+                        value={m._id}
+                        checked={selectedUserId === m._id}
+                        onChange={() => setSelectedUserId(m._id)}
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{m.name || m.email}</p>
+                        <p className="text-xs text-gray-500">{m.email}</p>
+                      </div>
+                    </label>
+                  ))}
+                {!membersLoading && members.length === 0 && (
+                  <p className="p-3 text-sm text-gray-500">No members found.</p>
+                )}
               </div>
 
-              {msg.fromMe && (
-                <img
-                  src="https://i.pravatar.cc/150?img=2"
-                  className="w-6 h-6 rounded-full"
-                  alt=""
-                />
-              )}
-            </div>
-          ))}
-        </div>
+              <textarea
+                placeholder="Say hi..."
+                value={newChatMessage}
+                onChange={(e) => setNewChatMessage(e.target.value)}
+                className="w-full border rounded-2xl px-3 py-2 text-sm min-h-[80px]"
+              />
 
-        {/* Input Box */}
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex bg-gray-100 rounded-full px-4 py-2">
-            <input
-              type="text"
-              placeholder="Type a message"
-              className="flex-1 bg-transparent outline-none text-sm"
-            />
-            <button className="text-blue-500">
-              <Send className="w-5 h-5" />
-            </button>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setOpenNewChat(false)}
+                  className="px-4 py-2 rounded-full border border-gray-200 text-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={startDirectChat}
+                  disabled={!selectedUserId}
+                  className="px-5 py-2 rounded-full bg-blue-500 text-white disabled:opacity-60"
+                >
+                  Start chat
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-        
-      </div>
+      )}
     </div>
   );
 };
