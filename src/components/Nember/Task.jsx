@@ -1,143 +1,74 @@
-"use client";
-
 import React, { useState } from "react";
-import Submit from "../Basic/submit"; // <-- Correct component import
+import Pagination from "../Basic/pagination"; 
+import Submit from "../Basic/submit"; // Correct import for submit popup
 
-const tasks = [
-  {
-    description: "User Research Research the...",
-    assignedTo: "Thor Odinson",
-    avatar: 1,
-    startDate: "15 Jun 2025",
-    dueDate: "15 Aug 2025",
-    status: "Completed",
-  },
-  {
-    description: "Wireframe Design",
-    assignedTo: "Loki Sharma",
-    avatar: 2,
-    startDate: "15 Jun 2025",
-    dueDate: "15 Aug 2025",
-    status: "In Progress",
-  },
-  {
-    description: "Visual Design",
-    assignedTo: "Tony Starlink",
-    avatar: 3,
-    startDate: "15 Jun 2025",
-    dueDate: "15 Aug 2025",
-    status: "In Progress",
-  },
-  {
-    description: "Usability Testing",
-    assignedTo: "Vijay Malyaaa",
-    avatar: 4,
-    startDate: "15 Jun 2025",
-    dueDate: "15 Aug 2025",
-    status: "Pending",
-  },
-  {
-    description: "Responsive Layout",
-    assignedTo: "Steve Vermaa",
-    avatar: 5,
-    startDate: "15 Jun 2025",
-    dueDate: "15 Aug 2025",
-    status: "Pending",
-  },
-  {
-    description: "Figma Design",
-    assignedTo: "Alexander Sir",
-    avatar: 6,
-    startDate: "15 Jun 2025",
-    dueDate: "15 Aug 2025",
-    status: "Completed",
-  },
-  {
-    description: "Authentication",
-    assignedTo: "Tanmay Pardhi",
-    avatar: 7,
-    startDate: "15 Jun 2025",
-    dueDate: "15 Aug 2025",
-    status: "Completed",
-  },
-];
+const TaskTable = ({ tasks }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const tasksPerPage = 5;
 
-const statusColor = {
-  Completed: "text-green-600 bg-green-100",
-  "In Progress": "text-yellow-600 bg-yellow-100",
-  Pending: "text-red-600 bg-red-100",
-};
+  const [popupData, setPopupData] = useState({
+    isOpen: false,
+    type: "",
+    task: null,
+  });
 
-const Task = () => {
-  const [popupOpen, setPopupOpen] = useState(false);
-  const [popupTitle, setPopupTitle] = useState("");
-
-  // Open popup with dynamic title
   const openPopup = (task, type) => {
-    setPopupTitle(`${type} - ${task.description}`);
-    setPopupOpen(true);
+    setPopupData({
+      isOpen: true,
+      type,
+      task,
+    });
   };
 
+  const closePopup = () => {
+    setPopupData({
+      isOpen: false,
+      type: "",
+      task: null,
+    });
+  };
+
+  // PAGINATION LOGIC
+  const indexOfLast = currentPage * tasksPerPage;
+  const indexOfFirst = indexOfLast - tasksPerPage;
+  const currentTasks = tasks.slice(indexOfFirst, indexOfLast);
+
   return (
-    <div className="w-full p-3 sm:p-4 lg:py-6">
-      <div className="overflow-x-auto w-full">
-        <table className="w-full table-auto border-separate border-spacing-y-3 min-w-[900px]">
-          <thead>
-            <tr className="text-left text-sm font-semibold text-gray-600 bg-white">
-              <th className="px-4 lg:px-6 py-4 rounded-l-lg">Description</th>
-              <th className="px-4 lg:px-6 py-4">Assigned to</th>
-              <th className="px-4 lg:px-6 py-4">Start Date</th>
-              <th className="px-4 lg:px-6 py-4">Due Date</th>
-              <th className="px-4 lg:px-6 py-4">Status</th>
-              <th className="px-4 lg:px-6 py-4">Updates</th>
-              <th className="px-4 lg:px-6 py-4 rounded-r-lg">Submit</th>
+    <div className="p-4">
+
+      {/* TABLE */}
+      <div className="overflow-x-auto rounded-xl shadow-sm border border-gray-200">
+        <table className="min-w-full bg-white">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">Task</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">Status</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">Update</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-600">Submit</th>
             </tr>
           </thead>
 
           <tbody>
-            {tasks.map((task, index) => (
-              <tr key={index} className="bg-white text-sm text-gray-800 rounded-lg shadow-sm">
-                <td className="px-4 lg:px-6 py-5 rounded-l-lg">
-                  {task.description}
-                </td>
+            {currentTasks.map((task, idx) => (
+              <tr key={idx} className="border-b hover:bg-gray-50">
+                <td className="px-6 py-4">{task.name}</td>
 
-                <td className="px-4 lg:px-6 py-5">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={`https://i.pravatar.cc/150?img=${task.avatar}`}
-                      alt={task.assignedTo}
-                      className="w-8 h-8 rounded-full"
-                    />
-                    <span>{task.assignedTo}</span>
-                  </div>
-                </td>
-
-                <td className="px-4 lg:px-6 py-5 text-gray-600">
-                  {task.startDate}
-                </td>
-
-                <td className="px-4 lg:px-6 py-5 text-gray-600">
-                  {task.dueDate}
-                </td>
-
-                <td className="px-4 lg:px-6 py-5">
-                  <span className={`text-xs font-medium px-2 py-1 border rounded-full ${statusColor[task.status]}`}>
-                    {task.status}
-                  </span>
+                <td className="px-6 py-4">
+                  <span className="text-sm text-green-600">{task.status}</span>
                 </td>
 
                 {/* UPDATE BUTTON */}
-                <td className="px-4 lg:px-6 py-5">
+                <td className="px-6 py-4">
                   <button
                     onClick={() => openPopup(task, "Update")}
                     className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition"
                   >
-                    Updates
+                    Update
                   </button>
                 </td>
 
                 {/* SUBMIT BUTTON */}
-                <td className="px-4 lg:px-6 py-5">
+                <td className="px-6 py-4">
                   <button
                     onClick={() => openPopup(task, "Submit")}
                     className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition"
@@ -145,21 +76,47 @@ const Task = () => {
                     Submit
                   </button>
                 </td>
-
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* 2-STEP POPUP COMPONENT */}
-      <Submit
-        isOpen={popupOpen}
-        onClose={() => setPopupOpen(false)}
-        title={popupTitle}
-      />
+      {/* PAGINATION */}
+      <div className="mt-4 flex justify-center">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={Math.ceil(tasks.length / tasksPerPage)}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+
+      {/* POPUP (FOR UPDATE & SUBMIT) */}
+      {popupData.isOpen && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-[90%] max-w-lg">
+
+            <h2 className="text-xl font-semibold mb-4">
+              {popupData.type === "Update" ? "Update Task" : "Submit Task"}
+            </h2>
+
+            {/* Re-using Submit component for popup content */}
+            <Submit task={popupData.task} type={popupData.type} />
+
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={closePopup}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default Task;
+export default TaskTable;
