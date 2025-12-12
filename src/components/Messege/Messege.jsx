@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { io } from "socket.io-client";
 import { Send, Plus } from "lucide-react";
@@ -47,35 +48,38 @@ const Messege = () => {
     return { _id: u._id || u.id, name: u.name || u.email || "Unknown", email: u.email };
   };
 
-  // Fetch user details from task-tracker and cache them in state
-  const fetchUserDetails = useCallback(async (userId) => {
-    if (!userId || !token) return;
-    
-    // Check cache first
-    if (userCache[userId]) {
-      return;
-    }
-
-    try {
-      // Try to get from company users first
-      const res = await axios.get(`${BASE_URL}/company/users`, authHeader);
-      const users = res.data?.users || [];
-      const found = users.find((u) => u._id === userId || u.id === userId);
+  // Fetch ALL company users once when chats exist (for displaying names)
+  useEffect(() => {
+    const fetchAllUsers = async () => {
+      if (!token || chats.length === 0) return;
       
-      if (found) {
-        const userData = {
-          _id: found._id || found.id,
-          name: found.name,
-          email: found.email,
-        };
+      try {
+        const res = await axios.get(`${BASE_URL}/company/users`, authHeader);
+        const users = res.data?.users || [];
         
-        // Update state cache
-        setUserCache((prev) => ({ ...prev, [userId]: userData }));
+        // Build cache object from all users at once
+        const cache = {};
+        users.forEach((user) => {
+          const userId = user._id || user.id;
+          if (userId) {
+            cache[userId] = {
+              _id: userId,
+              name: user.name,
+              email: user.email,
+            };
+          }
+        });
+        
+        setUserCache(cache);
+        // Also populate members list for new chat modal
+        setMembers(users);
+      } catch (err) {
+        console.error("Error fetching company users:", err);
       }
-    } catch (err) {
-      console.error(`Error fetching user ${userId}:`, err);
-    }
-  }, [token, authHeader, userCache]);
+    };
+    
+    fetchAllUsers();
+  }, [token, authHeader, chats.length]);
 
   const contactDisplay = (chat) => {
     if (chat?.isGroup) {
@@ -131,20 +135,6 @@ const Messege = () => {
         const list = res.data || [];
         setChats(list);
         if (list.length) setSelectedChat(list[0]);
-        
-        // Fetch user details for all members in all chats
-        const allMemberIds = new Set();
-        list.forEach((chat) => {
-          (chat.members || []).forEach((memberId) => {
-            if (memberId && memberId !== currentUserId) {
-              allMemberIds.add(memberId);
-            }
-          });
-        });
-        
-        allMemberIds.forEach((memberId) => {
-          fetchUserDetails(memberId);
-        });
       } catch (err) {
         console.error("Error loading chats", err);
         setChats([]);
@@ -153,9 +143,12 @@ const Messege = () => {
       }
     };
     fetchChats();
-  }, [token, authHeader, fetchUserDetails, currentUserId]);
+  }, [token, authHeader]);
 
   const loadMembers = async () => {
+    // Members are already loaded from userCache, no need to fetch again
+    if (members.length > 0) return;
+    
     if (!token) return;
     setMembersLoading(true);
     try {
@@ -189,6 +182,11 @@ const Messege = () => {
     socket.on("receive_message", (msg) => {
       console.log("Received message:", msg);
       upsertMessage(msg);
+      
+      // Auto-mark as seen if the chat is currently open
+      if (selectedChat?._id === msg.chatId && msg.senderId !== currentUserId) {
+        socket.emit("message_seen", msg._id);
+      }
     });
 
     socket.on("edit_message", (msg) => {
@@ -199,6 +197,35 @@ const Messege = () => {
     socket.on("delete_message", (msgId) => {
       console.log("Message deleted:", msgId);
       setMessages((prev) => prev.filter((m) => m._id !== msgId));
+    });
+
+    socket.on("message_seen", ({ messageId, userId }) => {
+      console.log("Message seen:", messageId, "by", userId);
+      // Update local message state to reflect seen status
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m._id === messageId) {
+            return {
+              ...m,
+              unreadBy: (m.unreadBy || []).filter((id) => id !== userId),
+            };
+          }
+          return m;
+        })
+      );
+    });
+
+    socket.on("chat_messages_seen", ({ chatId, userId, count }) => {
+      console.log(`${count} messages seen in chat ${chatId} by ${userId}`);
+      // Update all messages in current chat
+      if (selectedChat?._id === chatId) {
+        setMessages((prev) =>
+          prev.map((m) => ({
+            ...m,
+            unreadBy: (m.unreadBy || []).filter((id) => id !== userId),
+          }))
+        );
+      }
     });
 
     socket.on("error", (err) => {
@@ -213,7 +240,7 @@ const Messege = () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, upsertMessage]);
+  }, [token, upsertMessage, selectedChat?._id, currentUserId]);
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -227,14 +254,11 @@ const Messege = () => {
         const msgs = res.data || [];
         setMessages(msgs);
         
-        // Fetch user details for all senders in messages to populate cache
-        const senderIds = [...new Set(msgs.map((m) => m.senderId).filter(Boolean))];
-        senderIds.forEach((senderId) => {
-          fetchUserDetails(senderId);
-        });
-        
         // ensure room joined for realtime
         socketRef.current?.emit("join_chat", selectedChat._id);
+        
+        // Mark all messages in this chat as seen via socket (real-time)
+        socketRef.current?.emit("mark_chat_seen", selectedChat._id);
       } catch (err) {
         console.error("Error loading messages", err);
         setMessages([]);
@@ -243,7 +267,7 @@ const Messege = () => {
       }
     };
     fetchMessages();
-  }, [selectedChat?._id, authHeader, fetchUserDetails]);
+  }, [selectedChat?._id, authHeader]);
 
   const sendMessage = async () => {
     if (!input.trim() || !selectedChat?._id) return;
@@ -286,6 +310,14 @@ const Messege = () => {
   };
 
   const selectedContact = selectedChat ? contactDisplay(selectedChat) : null;
+  const navigate = useNavigate();
+  const openProfile = (chat) => {
+    // For direct chats, open other member's profile
+    const otherMemberId = chat?.members?.find((m) => m !== currentUserId);
+    if (otherMemberId) {
+      navigate(`/viewprofile/${otherMemberId}`);
+    }
+  };
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-3 p-4 sm:px-4 bg-gray-200 shadow rounded-3xl overflow-hidden md:min-w-[900px]">
@@ -329,12 +361,24 @@ const Messege = () => {
                 >
                   <img
                     src={info.avatar}
-                    className="w-10 h-10 rounded-full"
+                    className="w-10 h-10 rounded-full cursor-pointer"
                     alt={info.title}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openProfile(chat);
+                    }}
                   />
                   <div className="flex-1">
                     <div className="flex justify-between items-center text-sm font-medium">
-                      <span>{info.title}</span>
+                      <span
+                        className="cursor-pointer hover:text-blue-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openProfile(chat);
+                        }}
+                      >
+                        {info.title}
+                      </span>
                     </div>
                     <p className="text-xs text-gray-500 truncate">{info.subtitle}</p>
                   </div>
