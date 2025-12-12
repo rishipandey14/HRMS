@@ -1,5 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useLocation } from "react-router-dom";
+import axios from "axios";
 import Pagination from "../Basic/pagination";   // ⭐ Your required import
+import { BASE_URL } from "../../utility/Config";
 
 const mockProjects = Array.from({ length: 50 }, (_, i) => ({
   id: i + 1,
@@ -16,9 +19,32 @@ const statusColors = {
 };
 
 export default function ProfilePage() {
+  const { id: userIdParam } = useParams();
+  const location = useLocation();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const itemsPerPage = 5;
+
+  const [user, setUser] = useState(location.state?.user || null);
+  const token = useMemo(() => (typeof window !== "undefined" ? localStorage.getItem("token") : ""), []);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (user || !userIdParam || !token) return;
+      try {
+        // Fetch company users and pick the matching id
+        const res = await axios.get(`${BASE_URL}/company/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const list = Array.isArray(res.data?.users) ? res.data.users : [];
+        const found = list.find((u) => (u._id || u.id) === userIdParam);
+        if (found) setUser(found);
+      } catch (err) {
+        console.error("Failed to load user profile", err);
+      }
+    };
+    fetchUser();
+  }, [userIdParam, token]);
 
   const filteredProjects = mockProjects.filter((p) =>
     p.description.toLowerCase().includes(search.toLowerCase())
@@ -38,14 +64,14 @@ export default function ProfilePage() {
         {/* ----- Profile Header ----- */}
         <div className="flex flex-col md:flex-row md:items-center gap-6 border-b pb-6">
           <img
-            src="https://i.ibb.co/2d3Fb25/avatar.png"
+            src={`https://i.pravatar.cc/150?u=${user?._id || user?.id || "avatar"}`}
             className="w-20 h-20 rounded-full"
             alt="avatar"
           />
 
           <div className="flex-grow">
-            <h2 className="text-2xl font-semibold">Mohan Kumar</h2>
-            <p className="text-gray-500">Product Manager</p>
+            <h2 className="text-2xl font-semibold">{user?.name || user?.email || "User"}</h2>
+            <p className="text-gray-500">{"Member"}</p>
           </div>
 
           <div className="flex gap-3">
@@ -60,19 +86,19 @@ export default function ProfilePage() {
 
         {/* Joined Date */}
         <div className="text-right text-gray-500 text-sm mt-2 mb-8">
-          Date Joined: <span className="font-semibold">12-02-2025</span>
+          Date Joined: <span className="font-semibold">{new Date().toLocaleDateString()}</span>
         </div>
 
         {/* Details */}
         <div className="grid md:grid-cols-2 gap-6 border p-6 rounded-xl">
           <div>
             <p className="text-gray-500 text-sm">Full Name</p>
-            <p className="font-semibold">Mohan Kumar</p>
+            <p className="font-semibold">{user?.name || "-"}</p>
           </div>
 
           <div>
             <p className="text-gray-500 text-sm">Email Address</p>
-            <p className="font-semibold">Mohan@taskfleet.com</p>
+            <p className="font-semibold">{user?.email || "-"}</p>
           </div>
 
           <div>

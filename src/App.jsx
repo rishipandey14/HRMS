@@ -10,6 +10,7 @@ import ProtectedRoute from "./router/ProtectedRoute";
 import MobileBlockPage from "./utility/MobileBlockPage";
 import Login from "./pages/Login";
 import OrgSetup from "./components/Company/orgsetup";
+import ViewProfile from "./components/Basic/viewprofile";
 
 
 import ContactPage from "./pages/ContactPage";
@@ -43,6 +44,9 @@ function App() {
         <Route path="team" element={<Team />} />
         <Route path="jobs" element={<Jobs />} />
         <Route path="jobs/view" element={<JobDetails />} />
+
+        {/* profile route */}
+        <Route path="viewprofile/:id" element={<ViewProfile />} />
 
         {/* setting routes */}
         <Route path="settings" element={<Setting />} />
