@@ -72,7 +72,7 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
     };
 
     fetchMembers();
-  }, [projectId, projectParticipants]);
+  }, [projectId]); // Removed projectParticipants from dependencies
 
   // close dropdown when click outside current menu/button
   useEffect(() => {
