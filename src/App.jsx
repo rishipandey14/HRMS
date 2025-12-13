@@ -6,6 +6,7 @@ import Calendar from "./pages/Calendar";
 import Chat from "./pages/Chat";
 import Team from "./pages/Team";
 import Jobs from "./pages/Jobs";
+import CreateProject from "./pages/CreateProject";
 import ProtectedRoute from "./router/ProtectedRoute";
 import MobileBlockPage from "./utility/MobileBlockPage";
 import Login from "./pages/Login";
@@ -44,6 +45,7 @@ function App() {
         <Route path="team" element={<Team />} />
         <Route path="jobs" element={<Jobs />} />
         <Route path="jobs/view" element={<JobDetails />} />
+        <Route path="create-project" element={<CreateProject />} />
 
         {/* profile route */}
         <Route path="viewprofile/:id" element={<ViewProfile />} />

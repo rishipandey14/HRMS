@@ -1,8 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaChevronDown } from "react-icons/fa";
 import TableCal from "../components/Basic/tableCal";  // <-- IMPORT POPUP CALENDAR
+import axios from "axios";
+import { BASE_URL } from "../utility/Config";
+import { useNavigate } from "react-router-dom";
 
 const CreateProject = () => {
+  const navigate = useNavigate();
   const [projectName, setProjectName] = useState('');
   const [description, setDescription] = useState('');
 
@@ -13,18 +17,35 @@ const CreateProject = () => {
   const [dueDate, setDueDate] = useState("");
 
   const [showEmployeeList, setShowEmployeeList] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState('Tanmay Pardhi');
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
   const [showMoreAvatars, setShowMoreAvatars] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
-  const employees = [
-    { name: 'Tanmay Pardhi', role: 'UI/UX Designer', img: 'https://i.ibb.co/mFr9NX7b/Screenshot-9.png' },
-    { name: 'Loki Sharma', role: 'UI/UX Designer', img: 'https://i.ibb.co/FqYn8Zy5/47d1960ad7c2a2cd987d9dd9ba58a1ebf20ddd26.jpg' },
-    { name: 'Thor Odinson', role: 'Frontend Expert', img: 'https://i.ibb.co/DPWFyFqF/img1.jpg' },
-    { name: 'Tony Stark', role: 'Backend Developer', img: 'https://i.ibb.co/FLnWrQNT/img2.jpg' },
-    { name: 'Vijay Shah', role: 'Database Expert', img: 'https://i.ibb.co/NnTjMQqv/img3.jpg' },
-    { name: 'Steve Verma', role: 'Designer | Backend Dev', img: 'https://i.ibb.co/mFr9NX7b/Screenshot-9.png' },
-    { name: 'Harsh Baghele', role: 'Designer | Spring Dev', img: 'https://i.ibb.co/FLnWrQNT/img2.jpg' },
-  ];
+  useEffect(() => {
+    const fetchCompanyUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        const token = localStorage.getItem('token');
+        // Fetch only authorized users using the auth token
+        const response = await axios.get(`${BASE_URL}/company/users`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const users = (response.data.users || []).map(u => ({
+          _id: u._id,
+          name: u.name,
+          role: u.role || 'Member',
+          img: u.avatar || u.image || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name || 'User')}`
+        }));
+        setEmployees(users);
+      } catch (err) {
+        console.error('Error fetching users:', err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchCompanyUsers();
+  }, []);
 
   // -------- Calendar Handling --------
   const openCalFor = (field) => {
@@ -42,8 +63,25 @@ const CreateProject = () => {
   // -------- Form Submit --------
   const handleSubmit = (e) => {
     e.preventDefault();
-    setProjectName("");
-    setDescription("");
+    const payload = {
+      title: projectName,
+      description,
+      startDate,
+      endDate: dueDate,
+      participants: selectedEmployeeIds
+    };
+    const create = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post(`${BASE_URL}/projects`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        navigate('/dashboard');
+      } catch (err) {
+        console.error('Error creating project:', err);
+      }
+    };
+    create();
   };
 
   return (
@@ -107,41 +145,36 @@ const CreateProject = () => {
 
               </div>
 
-              {/* Selected Employees - Avatars */}
+              {/* Selected Employees - Avatars (Dynamic) */}
               <div className="mt-6">
                 <label className="block text-gray-700 font-medium mb-2">Selected Employees</label>
 
-                <div className="flex items-center">
-                  <img src="https://i.ibb.co/qLxsJ2VG/img1.jpg" className="w-8 h-8 rounded-full border-2 border-white object-cover" />
-                  <img src="https://i.ibb.co/6cqtKwyX/images2.jpg" className="w-8 h-8 rounded-full border-2 border-white -ml-2" />
-                  <img src="https://i.ibb.co/mFr9NX7b/Screenshot-9.png" className="w-8 h-8 rounded-full border-2 border-white -ml-2" />
-                  <img src="https://i.ibb.co/hFMN1vBH/images4.jpg" className="w-8 h-8 rounded-full border-2 border-white -ml-2" />
-
-                  {!showMoreAvatars ? (
-                    <button
-                      onClick={() => setShowMoreAvatars(true)}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs bg-gray-500 border-2 border-white -ml-2"
-                    >
-                      +3
-                    </button>
+                <div className="flex items-center min-h-[32px]">
+                  {selectedEmployeeIds.length === 0 ? (
+                    <span className="text-xs text-gray-500">No employees selected</span>
                   ) : (
-                    <>
-                      <img src="https://i.ibb.co/NnTjMQqv/img3.jpg" className="w-8 h-8 rounded-full border-2 border-white -ml-2" />
-                      <img src="https://i.ibb.co/FqYn8Zy5/47d1960ad7c2a2cd987d9dd9ba58a1ebf20ddd26.jpg" className="w-8 h-8 rounded-full border-2 border-white -ml-2" />
-                      <img src="https://i.ibb.co/S74JR9JF/images3.jpg" className="w-8 h-8 rounded-full border-2 border-white -ml-2" />
-                    </>
+                    employees
+                      .filter(emp => selectedEmployeeIds.includes(emp._id))
+                      .map((emp, idx) => (
+                        <img
+                          key={emp._id}
+                          src={emp.img}
+                          alt={emp.name}
+                          className={`w-8 h-8 rounded-full border-2 border-white object-cover ${idx > 0 ? '-ml-2' : ''}`}
+                        />
+                      ))
                   )}
                 </div>
               </div>
 
               {/* Buttons */}
               <div className="flex justify-between gap-12 mt-6">
-                <button type="button" className="border border-blue-400 text-blue-500 rounded-xl px-10 py-3">
+                <button type="button" className="border border-blue-400 text-blue-500 rounded-xl px-10 py-3" onClick={() => navigate(-1)}>
                   Cancel
                 </button>
 
-                <button type="submit" className="bg-blue-500 text-white rounded-xl px-10 py-3 hover:bg-blue-600">
-                  Create
+                <button type="submit" className={`rounded-xl px-10 py-3 text-white ${selectedEmployeeIds.length === 0 ? 'bg-blue-500/60 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600'}`} disabled={selectedEmployeeIds.length === 0}>
+                  {selectedEmployeeIds.length === 0 ? 'Select members to create' : 'Create'}
                 </button>
               </div>
             </div>
@@ -156,28 +189,47 @@ const CreateProject = () => {
                   onClick={() => setShowEmployeeList(!showEmployeeList)}
                 >
                   <span className="font-medium text-gray-700">Select Employee</span>
-                  <FaChevronDown
-                    className={`text-blue-500 transition-transform ${showEmployeeList ? 'rotate-180' : ''}`}
-                  />
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                      {selectedEmployeeIds.length} selected
+                    </span>
+                    <FaChevronDown
+                      className={`text-blue-500 transition-transform ${showEmployeeList ? 'rotate-180' : ''}`}
+                    />
+                  </div>
                 </button>
 
                 {showEmployeeList && (
                   <div>
-                    {employees.map((emp, idx) => (
+                    {loadingUsers ? (
+                      <div className="px-6 py-3 text-sm text-gray-500">Loading...</div>
+                    ) : employees.length === 0 ? (
+                      <div className="px-6 py-3 text-sm text-gray-500">No team members available</div>
+                    ) : employees.map((emp, idx) => (
                       <div
                         key={idx}
-                        onClick={() => setSelectedEmployee(emp.name)}
-                        className={`flex items-center px-6 py-3 cursor-pointer
-                          ${selectedEmployee === emp.name ? 'bg-blue-500' : 'hover:bg-gray-100'}
+                        className={`flex items-center px-6 py-3 cursor-pointer hover:bg-gray-100
                           ${idx !== employees.length - 1 ? 'border-b border-gray-200' : ''}
                         `}
                       >
+                        <input
+                          type="checkbox"
+                          checked={selectedEmployeeIds.includes(emp._id)}
+                          onChange={() => {
+                            setSelectedEmployeeIds(prev => (
+                              prev.includes(emp._id)
+                                ? prev.filter(id => id !== emp._id)
+                                : [...prev, emp._id]
+                            ))
+                          }}
+                          className="mr-4 w-4 h-4 accent-blue-600"
+                        />
                         <img src={emp.img} className="w-10 h-10 rounded-full mr-4 border-2" />
                         <div>
-                          <div className={`${selectedEmployee === emp.name ? 'text-white' : 'text-gray-800'} font-semibold`}>
+                          <div className={`text-gray-800 font-semibold`}>
                             {emp.name}
                           </div>
-                          <div className={`${selectedEmployee === emp.name ? 'text-blue-100' : 'text-gray-500'} text-xs`}>
+                          <div className={`text-gray-500 text-xs`}>
                             {emp.role}
                           </div>
                         </div>
