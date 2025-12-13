@@ -58,11 +58,11 @@ export default function ProfilePage() {
   );
 
   return (
-    <div className="w-full min-h-screen bg-gray-100 flex justify-center px-4 py-6">
-      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-lg p-6">
+    <div className="w-full min-h-screen bg-[#f4f4f4] flex justify-center px-4 py-6">
+      <div className="bg-white w-full max-w-5xl rounded-2xl shadow-sw p-6">
 
         {/* ----- Profile Header ----- */}
-        <div className="flex flex-col md:flex-row md:items-center gap-6 border-b pb-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-6 bg-sky-95 p-4 rounded-xl shadow-sm ">
           <img
             src={`https://i.pravatar.cc/150?u=${user?._id || user?.id || "avatar"}`}
             className="w-20 h-20 rounded-full"
@@ -75,10 +75,10 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex gap-3">
-            <button className="bg-blue-500 text-white px-4 py-2 rounded-lg">
+            <button className="w-full mt-2 text-sm bg-sky-500 text-white border px-3 py-1 rounded-full">
               Chat
             </button>
-            <button className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg">
+            <button className="w-full mt-2 text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition">
               Email
             </button>
           </div>
@@ -90,7 +90,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Details */}
-        <div className="grid md:grid-cols-2 gap-6 border p-6 rounded-xl">
+        <div className="flex grid md:grid-cols-2 gap-6 bg-sky-99 p-6 rounded-xl shadow-sm">
           <div>
             <p className="text-gray-500 text-sm">Full Name</p>
             <p className="font-semibold">{user?.name || "-"}</p>
@@ -119,7 +119,7 @@ export default function ProfilePage() {
           <input
             type="text"
             placeholder="Search Projects"
-            className="border rounded-xl px-4 py-1 text-sm"
+            className="border border-blue-500 text-sm text-blue-600 px-3 py-1 rounded-lg"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -131,7 +131,7 @@ export default function ProfilePage() {
         {/* Table */}
         <div className="overflow-x-auto mt-4">
           <table className="w-full border rounded-xl overflow-hidden">
-            <thead className="bg-gray-200 text-gray-600">
+            <thead className="bg-gray-100 text-blue-400">
               <tr>
                 <th className="p-3 text-left">Description</th>
                 <th className="p-3 text-left">Start Date</th>
@@ -142,7 +142,7 @@ export default function ProfilePage() {
 
             <tbody>
               {paginated.map((row) => (
-                <tr key={row.id} className="border-b">
+                <tr key={row.id} className="border-b border-blue-100">
                   <td className="p-3">{row.description}</td>
                   <td className="p-3">{row.startDate}</td>
                   <td className="p-3">{row.dueDate}</td>
