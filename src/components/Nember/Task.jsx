@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Submit from "../Basic/submit";
-import Pagination from "../Basic/pagination"; // <-- ADDED
+import Pagination from "../Basic/pagination";
 
 const tasks = [
   {
@@ -71,27 +71,14 @@ const Task = () => {
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupTitle, setPopupTitle] = useState("");
 
-  // ⭐ FILTER STATE
-  const [filterType, setFilterType] = useState("all");
-  const currentUser = "Thor Odinson";
-
   // ⭐ PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
 
-  // ⭐ APPLY FILTER
-  const filteredTasks =
-    filterType === "me"
-      ? tasks.filter((task) => task.assignedTo === currentUser)
-      : tasks;
-
   // ⭐ PAGINATION LOGIC
-  const totalPages = Math.ceil(filteredTasks.length / rowsPerPage);
+  const totalPages = Math.ceil(tasks.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedTasks = filteredTasks.slice(
-    startIndex,
-    startIndex + rowsPerPage
-  );
+  const paginatedTasks = tasks.slice(startIndex, startIndex + rowsPerPage);
 
   const openPopup = (task, type) => {
     setPopupTitle(`${type} - ${task.description}`);
@@ -101,21 +88,7 @@ const Task = () => {
   return (
     <div className="w-full p-3 sm:p-4 lg:py-6">
 
-      {/* ⭐ FILTER UI */}
-      <div className="flex justify-end mb-4">
-        <select
-          value={filterType}
-          onChange={(e) => {
-            setFilterType(e.target.value);
-            setCurrentPage(1); // reset to page 1 on filter change
-          }}
-          className="border px-3 py-2 rounded-lg text-sm"
-        >
-          <option value="all">Assigned to All</option>
-          <option value="me">Assigned to Me</option>
-        </select>
-      </div>
-
+      {/* TABLE */}
       <div className="overflow-x-auto w-full">
         <table className="w-full table-auto border-separate border-spacing-y-3 min-w-[900px]">
           <thead>
@@ -192,7 +165,7 @@ const Task = () => {
         </table>
       </div>
 
-      {/* ⭐ PAGINATION BELOW TABLE */}
+      {/* PAGINATION */}
       <div className="mt-4 flex justify-center">
         <Pagination
           currentPage={currentPage}

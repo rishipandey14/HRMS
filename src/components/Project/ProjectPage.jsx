@@ -12,7 +12,9 @@ const ProjectPage = () => {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("task");
+  const [taskFilter, setTaskFilter] = useState("all"); // NEW FILTER
   const [project, setProject] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -22,6 +24,7 @@ const ProjectPage = () => {
   // CHECK ADMIN ROLE
   useEffect(() => {
     const token = localStorage.getItem("token");
+
     if (token) {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
@@ -110,7 +113,7 @@ const ProjectPage = () => {
   return (
     <div className="w-full min-h-screen p-6 bg-gray-100 space-y-6">
 
-      {/* HEADER */}
+      {/* ---------------- HEADER ---------------- */}
       <div className="flex flex-col md:flex-row justify-between bg-white p-4 rounded-xl shadow-sm">
 
         {/* LEFT PANEL */}
@@ -121,6 +124,7 @@ const ProjectPage = () => {
             {project.description || "No description available"}
           </p>
 
+          {/* TEAM AVATARS */}
           <div className="flex items-center mt-3">
             {project.team?.slice(0, 3).map((member, index) => (
               <img
@@ -141,9 +145,8 @@ const ProjectPage = () => {
           </div>
         </div>
 
-        {/* RIGHT PANEL UPDATED */}
+        {/* RIGHT PANEL */}
         <div className="mt-4 md:mt-0 bg-gray-50 p-4 rounded-xl w-full md:w-64">
-
           <h3 className="text-lg font-semibold">{project.projectName}</h3>
 
           <p className="text-sm text-gray-600 mt-1">
@@ -161,7 +164,7 @@ const ProjectPage = () => {
             Chat
           </button>
 
-          {/* SUBMIT + ADD TASK IN ROW */}
+          {/* SUBMIT + ADD TASK BUTTONS (ADMIN ONLY) */}
           {isAdmin && (
             <div className="flex gap-3 mt-3">
               <button
@@ -182,35 +185,51 @@ const ProjectPage = () => {
         </div>
       </div>
 
-      {/* TABS */}
-      <div className="flex gap-6 border-b border-gray-300 pb-2">
-        <button
-          onClick={() => setActiveTab("task")}
-          className={`pb-1 text-sm font-medium ${
-            activeTab === "task"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-        >
-          Tasks
-        </button>
+      {/* ---------------- TABS + FILTER ---------------- */}
+      <div className="flex items-center justify-between border-b border-gray-300 pb-2">
 
-        <button
-          onClick={() => setActiveTab("member")}
-          className={`pb-1 text-sm font-medium ${
-            activeTab === "member"
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500"
-          }`}
-        >
-          Members
-        </button>
+        {/* TABS */}
+        <div className="flex gap-6">
+          <button
+            onClick={() => setActiveTab("task")}
+            className={`pb-1 text-sm font-medium ${
+              activeTab === "task"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-500"
+            }`}
+          >
+            Tasks
+          </button>
+
+          <button
+            onClick={() => setActiveTab("member")}
+            className={`pb-1 text-sm font-medium ${
+              activeTab === "member"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-500"
+            }`}
+          >
+            Members
+          </button>
+        </div>
+
+        {/* TASK FILTER (Only Visible in Tasks tab) */}
+        {activeTab === "task" && (
+          <select
+            value={taskFilter}
+            onChange={(e) => setTaskFilter(e.target.value)}
+            className="border border-blue-500 text-sm text-blue-600 px-3 py-1 rounded-lg"
+          >
+            <option value="all">All Tasks</option>
+            <option value="me">Assigned to Me</option>
+          </select>
+        )}
       </div>
 
-      {/* CONTENT */}
+      {/* ---------------- CONTENT ---------------- */}
       <div>
         {activeTab === "task" ? (
-          <Task projectId={projectId} />
+          <Task projectId={projectId} taskFilter={taskFilter} />
         ) : (
           <Nember projectId={projectId} projectParticipants={project.participants} />
         )}
