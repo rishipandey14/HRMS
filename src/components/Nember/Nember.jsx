@@ -3,9 +3,10 @@ import { Plus, X } from "lucide-react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 import { BASE_URL } from "../../utility/Config";
+import { mapUserData } from "../../utility/dataMapper";
 import ViewProfile from "../Basic/viewprofile"; // ✅ IMPORT VIEW PROFILE POPUP
 
-export default function Nember({ projectId: propProjectId }) {
+export default function Nember({ projectId: propProjectId, projectParticipants = [] }) {
   const { projectId: paramProjectId } = useParams();
   const projectId = propProjectId || paramProjectId; // Use prop if available, else from URL params
   
@@ -23,30 +24,25 @@ export default function Nember({ projectId: propProjectId }) {
         setLoading(true);
         const token = localStorage.getItem('token');
         
-        let endpoint = `${BASE_URL}/company/users`;
-        const params = {};
-        
-        // If projectId is available, filter by project participants
-        if (projectId) {
-          endpoint = `${BASE_URL}/projects/${projectId}`;
-        }
-        
-        const response = await axios.get(endpoint, {
-          headers: { Authorization: `Bearer ${token}` },
-          params: Object.keys(params).length > 0 ? params : undefined
-        });
-
         let usersData = [];
         
-        // Handle different response formats
-        if (projectId && response.data.participants) {
-          // If fetching project, participants is an array of user IDs
+        // First, check if participants are passed directly (already populated)
+        if (projectParticipants && Array.isArray(projectParticipants) && projectParticipants.length > 0) {
+          usersData = projectParticipants;
+        } else if (projectId) {
+          // Otherwise, fetch from API
+          const response = await axios.get(`${BASE_URL}/projects/${projectId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          
+          // Map API response to get participants (which are user objects)
           usersData = response.data.participants || [];
-        } else if (response.data.users) {
-          // If fetching company users
+        } else {
+          // Fallback: fetch all company users
+          const response = await axios.get(`${BASE_URL}/company/users`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           usersData = response.data.users || [];
-        } else if (Array.isArray(response.data)) {
-          usersData = response.data;
         }
         
         if (!Array.isArray(usersData)) {
@@ -54,27 +50,29 @@ export default function Nember({ projectId: propProjectId }) {
           return;
         }
         
-        const mappedUsers = usersData.map((user, idx) => ({
-          name: user.name || user,
-          email: user.email || 'N/A',
-          img: (idx % 70) + 1, // Random avatar
-          role: user.role === 'user' ? 'Employee' : (user.role || 'N/A'),
-          phone: user.mobile || 'N/A',
-          joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB') : 'N/A',
-          _id: user._id || user
-        }));
+        // Map users using dataMapper and add UI-specific properties
+        const mappedUsers = usersData.map((user, idx) => {
+          const mappedUser = mapUserData(user);
+          return {
+            ...mappedUser,
+            img: (idx % 70) + 1, // Random avatar for UI
+            phone: user.mobile || user.phone || 'N/A',
+            joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB') : 'N/A',
+            displayRole: user.role === 'user' ? 'Employee' : (user.role || 'N/A'),
+          };
+        });
         
         setMembers(mappedUsers);
       } catch (error) {
         console.error('Error fetching members:', error);
-        setMembers([]);
+        setMembers(projectParticipants && Array.isArray(projectParticipants) ? projectParticipants : []);
       } finally {
         setLoading(false);
       }
     };
 
     fetchMembers();
-  }, [projectId]);
+  }, [projectId, projectParticipants]);
 
   // close dropdown when click outside current menu/button
   useEffect(() => {
@@ -240,11 +238,11 @@ export default function Nember({ projectId: propProjectId }) {
                 <p className="font-semibold">Roles</p>
                 <div className="flex items-center gap-3 mt-1">
                   <label className="flex items-center gap-1">
-                    <input type="radio" name={`role-${selectedMember.email}`} defaultChecked={selectedMember.role === "Admin"} />
+                    <input type="radio" name={`role-${selectedMember.email}`} defaultChecked={selectedMember.displayRole === "Admin"} />
                     Admin
                   </label>
                   <label className="flex items-center gap-1">
-                    <input type="radio" name={`role-${selectedMember.email}`} defaultChecked={selectedMember.role === "Employee"} />
+                    <input type="radio" name={`role-${selectedMember.email}`} defaultChecked={selectedMember.displayRole === "Employee"} />
                     Employee
                   </label>
                 </div>

@@ -2,10 +2,11 @@
 import React, { useState } from "react";
 import { Paperclip, Send } from "lucide-react";
 
-const SubmitPopup = ({ isOpen, onClose, title }) => {
+const SubmitPopup = ({ isOpen, onClose, title, taskId, onSubmitTask }) => {
   const [openDescriptionPopup, setOpenDescriptionPopup] = useState(false);
   const [openConfirmPopup, setOpenConfirmPopup] = useState(false);
   const [description, setDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // When parent opens Popup → open first step
   React.useEffect(() => {
@@ -24,10 +25,19 @@ const SubmitPopup = ({ isOpen, onClose, title }) => {
     setOpenConfirmPopup(true);
   };
 
-  const handleFinalConfirm = () => {
-    setOpenConfirmPopup(false);
-    onClose(); // close whole popup
-    setDescription("");
+  const handleFinalConfirm = async () => {
+    setIsSubmitting(true);
+    try {
+      // Call the callback to submit the task
+      if (onSubmitTask && taskId) {
+        await onSubmitTask(taskId, description);
+      }
+      setOpenConfirmPopup(false);
+      onClose(); // close whole popup
+      setDescription("");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -106,9 +116,10 @@ const SubmitPopup = ({ isOpen, onClose, title }) => {
 
               <button
                 onClick={handleFinalConfirm}
-                className="px-5 py-2 rounded-full bg-blue-500 text-white"
+                disabled={isSubmitting}
+                className="px-5 py-2 rounded-full bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirm
+                {isSubmitting ? "Submitting..." : "Confirm"}
               </button>
             </div>
           </div>
