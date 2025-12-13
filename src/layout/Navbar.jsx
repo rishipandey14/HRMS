@@ -15,45 +15,21 @@ const Navbar = () => {
   });
 
   useEffect(() => {
-    const getUserInfo = async () => {
+    const getUserInfo = () => {
       try {
         const token = localStorage.getItem('token');
         if (token) {
           // Decode JWT token to get user information
           const payload = JSON.parse(atob(token.split('.')[1]));
           
-          // Try to fetch full user details from API
-          try {
-            const response = await axios.get(`${BASE_URL}/verify-token`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            
-            if (response.data && response.data.user) {
-              const user = response.data.user;
-              setUserData({
-                name: user.name || user.companyName || payload.email?.split('@')[0] || "User",
-                role: user.role === 'admin' ? 'Admin' : user.role === 'user' ? 'Employee' : payload.type === 'company' ? 'Company' : 'User',
-                email: user.email || payload.email || ""
-              });
-            } else {
-              // Fallback to token data if API doesn't return user details
-              setUserData({
-                name: payload.email?.split('@')[0] || "User",
-                role: payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User',
-                email: payload.email || ""
-              });
-            }
-          } catch (apiError) {
-            // Fallback to token data if API call fails
-            setUserData({
-              name: payload.email?.split('@')[0] || "User",
-              role: payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User',
-              email: payload.email || ""
-            });
-          }
+          setUserData({
+            name: payload.email?.split('@')[0] || "User",
+            role: payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User',
+            email: payload.email || ""
+          });
         }
       } catch (error) {
-        console.error('Error fetching user info:', error);
+        console.error('Error decoding token:', error);
       }
     };
 
