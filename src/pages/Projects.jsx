@@ -247,7 +247,8 @@ export default function ProjectsView() {
   const fetchProjects = async (companyId, token) => {
     try {
       setLoading(true);
-      const res = await axios.get(`${BASE_URL}/projects/company/${companyId}`, {
+      // ⭐ OPTIMIZED: Fetch projects with stats in ONE API call
+      const res = await axios.get(`${BASE_URL}/projects/company/${companyId}/with-stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const projects = res.data.projects || [];
@@ -261,23 +262,23 @@ export default function ProjectsView() {
 
   const categorizeProjects = (projects) => {
     const now = new Date();
-    const toCard = (p) => ({
-      _id: p._id,
-      id: p._id,
-      title: p.title,
-      priority: '',
-      progress: deriveProgress(p, now),
-      status: deriveStatus(p, now),
-      team: [],
-      stats: { views: 0, comments: 0 },
-    });
 
     const pending = [];
     const progress = [];
     const completed = [];
 
     projects.forEach((p) => {
-      const card = toCard(p);
+      const card = {
+        _id: p._id,
+        id: p._id,
+        title: p.title,
+        priority: '',
+        progress: p.taskProgress || 0, // ⭐ Use progress from backend
+        status: deriveStatus(p, now),
+        team: [],
+        stats: { views: 0, comments: 0 },
+      };
+
       if (card.status === 'pending') pending.push(card);
       else if (card.status === 'progress') progress.push(card);
       else completed.push(card);
@@ -296,17 +297,7 @@ export default function ProjectsView() {
     return 'progress';
   };
 
-  const deriveProgress = (p, now) => {
-    const start = p.startDate ? new Date(p.startDate) : null;
-    const end = p.endDate ? new Date(p.endDate) : null;
-    if (!start || !end || end <= start) return 0;
-    if (end < now) return 100;
-    if (start > now) return 0;
-    const total = end - start;
-    const elapsed = now - start;
-    const pct = Math.max(0, Math.min(100, Math.round((elapsed / total) * 100)));
-    return pct;
-  };
+
   return (
     <div
       className="flex min-h-screen flex-col transparent-scrollbar"

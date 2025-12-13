@@ -1,32 +1,101 @@
 // parent/AssignTask.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaChevronDown } from "react-icons/fa";
-import TableCal from "../components/Basic/tableCal";
+import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { BASE_URL } from "../utility/Config";
 
-const employees = [
-  { name: 'Tanmay Pardhi', role: 'UI/UX Designer', img: 'https://i.ibb.co/mFr9NX7b/Screenshot-9.png' },
-  { name: 'Loki Sharma', role: 'UI/UX Designer', img: 'https://i.ibb.co/FqYn8Zy5/47d1960ad7c2a2cd987d9dd9ba58a1ebf20ddd26.jpg' },
-  { name: 'Thor Odinson', role: 'Frontend Expert', img: 'https://i.ibb.co/DPWFyFqF/img1.jpg' },
-  { name: 'Tony Stark', role: 'Backend Developer', img: 'https://i.ibb.co/FLnWrQNT/img2.jpg' },
-  { name: 'Vijay Shah', role: 'Database Expert', img: 'https://i.ibb.co/NnTjMQqv/img3.jpg' },
-  { name: 'Steve Verma', role: 'Designer | Backend Dev', img: 'https://i.ibb.co/mFr9NX7b/Screenshot-9.png' },
-  { name: 'Harsh Baghele', role: 'Designer | Spring Dev', img: 'https://i.ibb.co/FLnWrQNT/img2.jpg' },
-];
+const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
+  const { projectId: routeProjectId } = useParams();
+  const navigate = useNavigate();
+  const projectId = propProjectId || routeProjectId;
 
-const AssignTask = () => {
   const [taskName, setTaskName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedEmployee, setSelectedEmployee] = useState(employees[0].name);
+  const [selectedEmployee, setSelectedEmployee] = useState("");
   const [showEmployeeList, setShowEmployeeList] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  // Fetch project participants
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get(`${BASE_URL}/projects/${projectId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        const participants = res.data.participants || [];
+        setEmployees(participants);
+        if (participants.length > 0) {
+          setSelectedEmployee(participants[0]._id);
+        }
+      } catch (err) {
+        console.error("Error fetching employees:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (projectId) {
+      fetchEmployees();
+    }
+  }, [projectId]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setTaskName("");
-    setDescription("");
-    setStartDate("");
-    setEndDate("");
+    
+    if (!taskName.trim() || !startDate || !endDate || !selectedEmployee) {
+      alert("Please fill all required fields");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem("token");
+
+      const taskData = {
+        title: taskName,
+        description: description || taskName,
+        startingDate: startDate,
+        deadline: endDate,
+        assignedTo: [selectedEmployee],
+        status: "Not Started",
+      };
+
+      await axios.post(`${BASE_URL}/tasks/${projectId}`, taskData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setTaskName("");
+      setDescription("");
+      setStartDate("");
+      setEndDate("");
+      
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        navigate(`/projects/${projectId}`);
+      }
+    } catch (err) {
+      console.error("Error creating task:", err);
+      alert("Failed to create task. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    } else {
+      navigate(`/projects/${projectId}`);
+    }
   };
 
   return (
@@ -64,27 +133,50 @@ const AssignTask = () => {
                 onChange={(e) => setDescription(e.target.value)}
               />
 
-              {/* Calendar from the other folder */}
-              <TableCal
-                startDate={startDate}
-                setStartDate={setStartDate}
-                endDate={endDate}
-                setEndDate={setEndDate}
-              />
+              <label className="block text-gray-700 font-medium mb-2 mt-6">
+                Select Duration
+              </label>
+
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm text-gray-700">Start Date</span>
+                  <input
+                    type="date"
+                    className="h-10 w-36 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    placeholder="dd/mm/yyyy"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm text-gray-700">Due Date</span>
+                  <input
+                    type="date"
+                    className="h-10 w-36 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    placeholder="dd/mm/yyyy"
+                  />
+                </div>
+              </div>
 
               <div className="flex justify-between mt-8">
                 <button
                   type="button"
                   className="border border-blue-400 text-blue-500 rounded-lg px-8 py-2 hover:bg-blue-50"
+                  onClick={handleCancel}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="bg-blue-500 text-white rounded-lg px-8 py-2 hover:bg-blue-600"
+                  className="bg-blue-500 text-white rounded-lg px-8 py-2 hover:bg-blue-600 disabled:opacity-50"
+                  disabled={submitting}
                 >
-                  Assign
+                  {submitting ? "Creating..." : "Assign"}
                 </button>
               </div>
             </div>
@@ -102,7 +194,9 @@ const AssignTask = () => {
                   onClick={() => setShowEmployeeList((v) => !v)}
                 >
                   <span className="font-medium text-gray-700">
-                    Select Employee
+                    {!loading && selectedEmployee
+                      ? employees.find(e => e._id === selectedEmployee)?.name || "Select Employee"
+                      : "Select Employee"}
                   </span>
                   <FaChevronDown
                     className={`ml-2 text-blue-500 transition-transform duration-200 ${
@@ -115,10 +209,10 @@ const AssignTask = () => {
                   <div className="w-full">
                     {employees.map((emp, idx) => (
                       <div
-                        key={emp.name}
+                        key={emp._id}
                         className={`flex items-center px-6 py-4 cursor-pointer 
                         ${
-                          selectedEmployee === emp.name
+                          selectedEmployee === emp._id
                             ? "bg-blue-500"
                             : "hover:bg-gray-100"
                         }
@@ -127,10 +221,13 @@ const AssignTask = () => {
                             ? "border-b border-gray-200"
                             : ""
                         }`}
-                        onClick={() => setSelectedEmployee(emp.name)}
+                        onClick={() => {
+                          setSelectedEmployee(emp._id);
+                          setShowEmployeeList(false);
+                        }}
                       >
                         <img
-                          src={emp.img}
+                          src={`https://i.pravatar.cc/150?img=${(idx % 70) + 1}`}
                           alt={emp.name}
                           className="w-10 h-10 rounded-full mr-4 object-cover border-2 border-white"
                         />
@@ -138,7 +235,7 @@ const AssignTask = () => {
                         <div>
                           <div
                             className={`font-semibold ${
-                              selectedEmployee === emp.name
+                              selectedEmployee === emp._id
                                 ? "text-white"
                                 : "text-gray-800"
                             }`}
@@ -147,12 +244,12 @@ const AssignTask = () => {
                           </div>
                           <div
                             className={`text-xs ${
-                              selectedEmployee === emp.name
+                              selectedEmployee === emp._id
                                 ? "text-blue-100"
                                 : "text-gray-500"
                             }`}
                           >
-                            {emp.role}
+                            {emp.role || "Team Member"}
                           </div>
                         </div>
                       </div>
