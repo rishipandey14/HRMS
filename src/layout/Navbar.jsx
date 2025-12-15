@@ -1,9 +1,40 @@
 import { Bell, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "./NotificationDropdown";
+import axios from "axios";
+import { BASE_URL } from "../utility/Config";
 
 const Navbar = () => {
+  const navigate = useNavigate();
   const [openNoti, setOpenNoti] = useState(false);
+  const [userData, setUserData] = useState({
+    name: "Loading...",
+    role: "User",
+    email: ""
+  });
+
+  useEffect(() => {
+    const getUserInfo = () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          // Decode JWT token to get user information
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          
+          setUserData({
+            name: payload.email?.split('@')[0] || "User",
+            role: payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User',
+            email: payload.email || ""
+          });
+        }
+      } catch (error) {
+        console.error('Error decoding token:', error);
+      }
+    };
+
+    getUserInfo();
+  }, []);
 
   return (
     <header className="w-full bg-[#f0f0f0] px-6 py-3 flex items-center justify-between rounded-xl relative">
@@ -45,17 +76,20 @@ const Navbar = () => {
         <div className="h-6 border-l border-gray-300" />
 
         {/* Avatar */}
-        <div className="flex items-center gap-2">
+        <div 
+          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => navigate('/settings')}
+        >
           <img
-            src="https://api.dicebear.com/7.x/thumbs/svg?seed=Tanmay"
+            src={`https://api.dicebear.com/7.x/thumbs/svg?seed=${userData.name}`}
             alt="Avatar"
             className="w-10 h-10 rounded-full border-2 border-white"
           />
           <div>
             <p className="text-sm font-medium text-black leading-4">
-              Tanmay Pardhi
+              {userData.name}
             </p>
-            <p className="text-xs text-gray-400">User</p>
+            <p className="text-xs text-gray-400">{userData.role}</p>
           </div>
         </div>
       </div>

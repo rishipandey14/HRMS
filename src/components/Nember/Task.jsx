@@ -2,13 +2,14 @@ import React, { useState, useEffect } from "react";
 import Submit from "../Basic/submit";
 import Pagination from "../Basic/pagination";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { BASE_URL } from "../../utility/Config";
 import { mapTaskData, formatDate } from "../../utility/dataMapper";
 
 const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   const { projectId: paramProjectId } = useParams();
   const projectId = propProjectId || paramProjectId;
+  const navigate = useNavigate();
 
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
@@ -16,6 +17,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   const [error, setError] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [popupTitle, setPopupTitle] = useState("");
+  const [popupMode, setPopupMode] = useState("Update");
   const [selectedTask, setSelectedTask] = useState(null);
 
   // ⭐ PAGINATION STATE
@@ -140,10 +142,16 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   const openPopup = (task, type) => {
     setSelectedTask(task);
     setPopupTitle(`${type} - ${task.description}`);
+    setPopupMode(type);
     setPopupOpen(true);
   };
 
-  // ⭐ HANDLE TASK SUBMISSION (Mark as Completed)
+  const goToUpdatesPage = (task) => {
+    if (!projectId || !task?._id) return;
+    navigate(`/projects/${projectId}/tasks/${task._id}/updates`, { state: { task } });
+  };
+
+  // ⭐ HANDLE TASK ACTIONS (updates vs final submit)
   const handleSubmitTask = async (taskId, description) => {
     try {
       const token = localStorage.getItem("token");
@@ -153,28 +161,45 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
         return;
       }
 
-      // Update task status to Completed
-      const res = await axios.put(
-        `${BASE_URL}/tasks/${projectId}/${taskId}`,
-        { 
-          status: "Completed",
-          submissionNotes: description
+      const commonHeaders = {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
+      };
+
+      if (popupMode === "Submit") {
+        // Final submission: mark task as completed
+        const res = await axios.put(
+          `${BASE_URL}/tasks/${projectId}/${taskId}`,
+          { 
+            status: "Completed",
+            submissionNotes: description,
           },
-        }
-      );
+          commonHeaders
+        );
 
-      // Update local task list
-      setTasks((prevTasks) =>
-        prevTasks.map((task) =>
-          task._id === taskId ? { ...task, status: "Completed" } : task
-        )
-      );
+        // Update local task list to reflect completion
+        setTasks((prevTasks) =>
+          prevTasks.map((task) =>
+            task._id === taskId ? { ...task, status: "Completed" } : task
+          )
+        );
 
-      console.log("Task marked as completed:", res.data);
+        console.log("Task marked as completed:", res.data);
+      } else {
+        // Regular update: add an update entry without closing the task
+        const currentStatus = selectedTask?.status || "In Progress";
+        await axios.post(
+          `${BASE_URL}/tasks/${projectId}/${taskId}/updates`,
+          {
+            status: currentStatus,
+            note: description,
+            date: new Date(),
+          },
+          commonHeaders
+        );
+        console.log("Task update added");
+      }
     } catch (err) {
       console.error("Error submitting task:", err);
     }
@@ -234,7 +259,13 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 className="bg-white text-sm text-gray-800 rounded-lg shadow-sm"
               >
                 <td className="px-4 lg:px-6 py-5 rounded-l-lg">
-                  {task.description}
+                  <button
+                    type="button"
+                    className="text-left w-full hover:text-blue-600"
+                    onClick={() => goToUpdatesPage(task)}
+                  >
+                    {task.description}
+                  </button>
                 </td>
 
                 <td className="px-4 lg:px-6 py-5">

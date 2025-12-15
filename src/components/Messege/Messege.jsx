@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { Send, Plus } from "lucide-react";
+import { Send, Plus, MoreVertical } from "lucide-react";
 import { CHAT_BASE_URL, BASE_URL } from "../../utility/Config";
 
 const parseToken = (token) => {
@@ -14,7 +14,8 @@ const parseToken = (token) => {
   }
 };
 
-const Messege = () => {
+const Messege = ({ initialChatId }) => {
+  const location = useLocation();
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -29,6 +30,7 @@ const Messege = () => {
   const [memberSearch, setMemberSearch] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [newChatMessage, setNewChatMessage] = useState("");
+  const [openMenuId, setOpenMenuId] = useState(null);
   
   // User cache to avoid repeated API calls - stored in state to trigger re-renders
   const [userCache, setUserCache] = useState({});
@@ -134,7 +136,16 @@ const Messege = () => {
         const res = await axios.get(`${CHAT_BASE_URL}/api/chats`, authHeader);
         const list = res.data || [];
         setChats(list);
-        if (list.length) setSelectedChat(list[0]);
+        const chatIdFromState = location.state?.chatId;
+        const targetChatId = chatIdFromState || initialChatId;
+        if (targetChatId) {
+          const chatFromState = list.find((chat) => chat._id === targetChatId);
+          if (chatFromState) {
+            setSelectedChat(chatFromState);
+          }
+        } else if (list.length) {
+          setSelectedChat(list[0]);
+        }
       } catch (err) {
         console.error("Error loading chats", err);
         setChats([]);
@@ -143,7 +154,14 @@ const Messege = () => {
       }
     };
     fetchChats();
-  }, [token, authHeader]);
+  }, [token, authHeader, location.state?.chatId, initialChatId]);
+
+  // Close any open context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
   const loadMembers = async () => {
     // Members are already loaded from userCache, no need to fetch again
@@ -309,6 +327,21 @@ const Messege = () => {
     }
   };
 
+  const deleteChat = async (chatId) => {
+    if (!chatId || !window.confirm("Are you sure you want to delete this chat?")) return;
+    try {
+      await axios.delete(`${CHAT_BASE_URL}/api/chats/${chatId}`, authHeader);
+      setChats((prev) => prev.filter((chat) => chat._id !== chatId));
+      if (selectedChat?._id === chatId) {
+        setSelectedChat(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error("Error deleting chat:", err);
+      alert("Failed to delete chat.");
+    }
+  };
+
   const selectedContact = selectedChat ? contactDisplay(selectedChat) : null;
   const navigate = useNavigate();
   const openProfile = (chat) => {
@@ -322,7 +355,7 @@ const Messege = () => {
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] gap-3 p-4 sm:px-4 bg-gray-200 shadow rounded-3xl overflow-hidden md:min-w-[900px]">
       {/* Left: Contacts */}
-      <div className="w-full md:w-[360px] md:flex-none p-4 bg-white rounded-3xl flex flex-col max-h-[calc(100vh-120px)] overflow-hidden">
+      <div className="w-full md:w-[360px] md:flex-none p-4 bg-white rounded-3xl flex flex-col max-h-[calc(100vh-120px)] min-h-0 overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Messages</h2>
           <button
@@ -339,52 +372,83 @@ const Messege = () => {
         <input
           type="text"
           placeholder="Search messages"
-          className="px-4 py-2 border rounded-full text-sm border-gray-200"
+          className="border border-gray-300 rounded-lg px-3 py-2 mb-4"
+          value={memberSearch}
+          onChange={(e) => setMemberSearch(e.target.value)}
         />
 
-        <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-2">
-          {loadingChats && <p className="text-sm text-gray-500">Loading chats...</p>}
-          {!loadingChats && chats.length === 0 && (
-            <p className="text-sm text-gray-500">No chats yet.</p>
-          )}
-          {!loadingChats &&
-            chats.map((chat) => {
-              const info = contactDisplay(chat);
-              const active = selectedChat?._id === chat._id;
-              return (
-                <button
-                  key={chat._id}
-                  onClick={() => setSelectedChat(chat)}
-                  className={`w-full text-left flex gap-3 items-start p-2 rounded-xl cursor-pointer ${
-                    active ? "bg-gray-100" : "hover:bg-gray-50"
-                  }`}
-                >
+        <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto translucent-scrollbar pr-1">
+          {chats.map((chat) => {
+            const contact = contactDisplay(chat);
+            return (
+              <div
+                key={chat._id}
+                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition ${
+                  selectedChat?._id === chat._id ? "bg-gray-200" : ""
+                }`}
+                onClick={() => {
+                  setSelectedChat(chat);
+                  setOpenMenuId(null);
+                }}
+              >
+                <div className="flex items-center gap-3">
                   <img
-                    src={info.avatar}
-                    className="w-10 h-10 rounded-full cursor-pointer"
-                    alt={info.title}
+                    src={contact.avatar}
+                    alt="avatar"
+                    className="w-10 h-10 rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openProfile(chat);
+                      if (chat.isGroup) {
+                        navigate(`/projects/${chat._id}`);
+                      } else {
+                        navigate(`/profile/${chat.userId}`);
+                      }
                     }}
                   />
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center text-sm font-medium">
-                      <span
-                        className="cursor-pointer hover:text-blue-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openProfile(chat);
-                        }}
-                      >
-                        {info.title}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 truncate">{info.subtitle}</p>
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (chat.isGroup) {
+                        navigate(`/projects/${chat._id}`);
+                      } else {
+                        navigate(`/profile/${chat.userId}`);
+                      }
+                    }}
+                  >
+                    <h3 className="text-sm font-semibold">{contact.title}</h3>
+                    <p className="text-xs text-gray-500">{contact.subtitle}</p>
                   </div>
-                </button>
-              );
-            })}
+                </div>
+                <div className="relative">
+                  <button
+                    className="p-2 rounded-full hover:bg-gray-200"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId((prev) => (prev === chat._id ? null : chat._id));
+                    }}
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+                  <div
+                    className={`absolute right-0 mt-2 w-32 bg-white border border-gray-300 rounded-lg shadow-lg ${
+                      openMenuId === chat._id ? "" : "hidden"
+                    }`}
+                  >
+                    <button
+                      className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(null);
+                        deleteChat(chat._id);
+                      }}
+                    >
+                      Delete Chat
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

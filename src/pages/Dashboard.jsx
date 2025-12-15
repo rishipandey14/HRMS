@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useNavigate } from "react-router-dom"
 import { TrendingUp, Video, Pause, Square, Search, Plus, MonitorX, X } from "lucide-react"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import axios from "axios"
@@ -8,6 +9,7 @@ import { BASE_URL } from "../utility/Config"
 
 const Dashboard = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280)
+  const navigate = useNavigate()
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isUserPanelOpen, setIsUserPanelOpen] = useState(true);
   const [showAppsPopup, setShowAppsPopup] = useState(false);
@@ -21,10 +23,35 @@ const Dashboard = () => {
   });
   const [companyUsers, setCompanyUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [dashboardData, setDashboardData] = useState({
+    totalProjects: 0,
+    endedProjects: 0,
+    runningProjects: 0,
+    pendingProjects: 0,
+    projectProgress: { completed: 0, inProgress: 0, pending: 0 },
+    teamMembers: [],
+    reminders: [],
+    totalDailyHours: 0,
+    isAdmin: false
+  });
+
+  // Static Project Analytics Data
+  const staticProjectAnalytics = [
+    { name: "Sun", value: 25 },
+    { name: "Mon", value: 65 },
+    { name: "Tue", value: 40 },
+    { name: "Wed", value: 55 },
+    { name: "Thu", value: 30 },
+    { name: "Fri", value: 45 },
+    { name: "Sat", value: 80 },
+  ];
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [elapsedTime, setElapsedTime] = useState(0); // Time in seconds
   const appsBtnRef = useRef(null);
   const popupRef = useRef(null);
+  const timerRef = useRef(null);
 
-  // Check user role from token
+  // Check user role and fetch dashboard data
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -33,13 +60,48 @@ const Dashboard = () => {
         const isAdmin = payload.role === 'admin';
         setIsAdminPanelOpen(isAdmin);
         setIsUserPanelOpen(!isAdmin);
+        
+        // Fetch dashboard data
+        fetchDashboardData(token);
       } catch (error) {
         console.error('Error parsing token:', error);
         setIsAdminPanelOpen(false);
         setIsUserPanelOpen(true);
+        setLoadingDashboard(false);
       }
+    } else {
+      setLoadingDashboard(false);
     }
   }, []);
+
+  const fetchDashboardData = async (token) => {
+    try {
+      setLoadingDashboard(true);
+      const response = await axios.get(`${BASE_URL}/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        setDashboardData(response.data.data);
+        // Convert hours to seconds for timer
+        const hours = response.data.data.totalDailyHours;
+        const totalSeconds = Math.round(hours * 3600);
+        setElapsedTime(totalSeconds);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  };
+
+  // Time Tracker - Format seconds to HH:MM:SS
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // Fetch company users when modal opens
   useEffect(() => {
@@ -194,7 +256,7 @@ const Dashboard = () => {
           </div>
           {isAdminPanelOpen && (
             <button 
-              onClick={() => setShowProjectModal(true)}
+              onClick={() => navigate('/create-project')}
               className="px-6 py-3 bg-white text-blue-600 border border-blue-600 rounded-full text-sm font-medium cursor-pointer flex items-center gap-2 transition-all duration-200 hover:bg-blue-600 hover:text-white"
             >
               <Plus size={16} />
@@ -248,8 +310,8 @@ const Dashboard = () => {
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-5xl font-bold mb-2 leading-none">24</div>
-          <p className="text-xs text-white/80">6+ increased from last month</p>
+          <div className="text-5xl font-bold mb-2 leading-none">{dashboardData.totalProjects}</div>
+          <p className="text-xs text-white/80">All company projects</p>
         </div>
 
         {/* Ended Projects */}
@@ -260,8 +322,8 @@ const Dashboard = () => {
               <TrendingUp className="w-4 h-4 text-gray-600" />
             </div>
           </div>
-          <div className="text-5xl font-bold mb-2 leading-none text-gray-900">8</div>
-          <p className="text-xs text-blue-600">4+ increased from last month</p>
+          <div className="text-5xl font-bold mb-2 leading-none text-gray-900">{dashboardData.endedProjects}</div>
+          <p className="text-xs text-blue-600">Completed projects</p>
         </div>
 
         {/* Running Projects */}
@@ -272,8 +334,8 @@ const Dashboard = () => {
               <TrendingUp className="w-4 h-4 text-gray-600" />
             </div>
           </div>
-          <div className="text-5xl font-bold mb-2 leading-none text-gray-900">5</div>
-          <p className="text-xs text-blue-600">4+ increased from last month</p>
+          <div className="text-5xl font-bold mb-2 leading-none text-gray-900">{dashboardData.runningProjects}</div>
+          <p className="text-xs text-blue-600">Active projects</p>
         </div>
 
         {/* Pending Projects */}
@@ -284,8 +346,8 @@ const Dashboard = () => {
               <TrendingUp className="w-4 h-4 text-gray-600" />
             </div>
           </div>
-          <div className="text-5xl font-bold mb-2 leading-none text-gray-900">4</div>
-          <p className="text-xs text-blue-600">On Discuss</p>
+          <div className="text-5xl font-bold mb-2 leading-none text-gray-900">{dashboardData.pendingProjects}</div>
+          <p className="text-xs text-blue-600">Not started</p>
         </div>
       </div>
 
@@ -295,11 +357,11 @@ const Dashboard = () => {
         <div className="min-w-[580px] max-w-[650px] w-full flex-1 bg-white p-6 border border-gray-200 shadow-md flex flex-col justify-between" style={{ height: '216px', borderRadius: '30px', opacity: 1 }}>
           <h3 className="text-xl font-semibold text-gray-900 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>Project Analytics</h3>
           <div className="flex-1 flex items-end justify-between w-full h-full">
-            {/* Bar Chart */}
-            {[25, 65, 40, 55, 30, 45, 80].map((v, i) => (
+            {/* Bar Chart - Static Data */}
+            {staticProjectAnalytics.map((item, i) => (
               <div key={i} className="flex flex-col items-center justify-end h-full">
-                <div className="w-8 rounded-t-lg" style={{width: `${50}px` , height: `${v * 1.5}px`, background: 'linear-gradient(180deg, #4FC3F7 0%, #1976D2 100%)' }}></div>
-                <span className="text-xs text-gray-500 mt-2">{['S','M','T','W','T','F','S'][i]}</span>
+                <div className="w-8 rounded-t-lg" style={{width: `${50}px` , height: `${item.value * 1.5}px`, background: 'linear-gradient(180deg, #4FC3F7 0%, #1976D2 100%)' }}></div>
+                <span className="text-xs text-gray-500 mt-2">{item.name}</span>
               </div>
             ))}
           </div>
@@ -308,17 +370,28 @@ const Dashboard = () => {
         <div className="min-w-[250px] max-w-[310px] w-full flex-1 bg-white p-6 border border-gray-200 shadow-md flex flex-col justify-between" style={{ height: '217px', borderRadius: '30px', opacity: 1 }}>
           <h3 className="text-lg font-semibold text-gray-900 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>Reminders</h3>
           <div>
-            <div className="text-blue-600 font-semibold cursor-pointer mb-1">Meeting with Abc Company</div>
-            <div className="text-gray-500 text-sm mb-4">Time: 02:00 pm - 04:00 pm</div>
-            <button className="bg-blue-600 text-white px-5 py-2 rounded-xl flex items-center gap-2 font-medium border-none cursor-pointer text-sm transition-colors duration-200 hover:bg-blue-800 w-full justify-center">
-              <Video size={16} /> Start Meeting
-            </button>
+            {dashboardData.reminders.length > 0 ? (
+              <>
+                <div className="text-blue-600 font-semibold cursor-pointer mb-1">{dashboardData.reminders[0].title}</div>
+                <div className="text-gray-500 text-sm mb-4">Time: {dashboardData.reminders[0].time}</div>
+                <a 
+                  href="https://meet.google.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-blue-600 text-white px-5 py-2 rounded-xl flex items-center gap-2 font-medium border-none cursor-pointer text-sm transition-colors duration-200 hover:bg-blue-800 w-full justify-center inline-flex"
+                >
+                  <Video size={16} /> Start Meeting
+                </a>
+              </>
+            ) : (
+              <div className="text-gray-500 text-sm">No reminders</div>
+            )}
           </div>
         </div>
         {/* Time Tracker */}
         <div className="min-w-[250px] max-w-[310px] w-full flex-1 p-6 shadow-md flex flex-col items-center justify-center" style={{ height: '217px', borderRadius: '30px', opacity: 1, borderWidth: '1px', borderStyle: 'solid', borderColor: '#e5e7eb', background: 'linear-gradient(135deg, #1976D2 0%, #4FC3F7 100%)' }}>
           <h3 className="text-lg font-semibold text-white mb-4 self-start" style={{ fontFamily: 'Inter, sans-serif' }}>Time Tracker</h3>
-          <div className="text-4xl font-bold mb-6 tracking-wider font-mono text-white">01:23:42</div>
+          <div className="text-4xl font-bold mb-6 tracking-wider font-mono text-white">{formatTime(elapsedTime)}</div>
           {/* Removed Pause and Stop buttons */}
         </div>
         {/* Projects */}
@@ -326,62 +399,26 @@ const Dashboard = () => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Inter, sans-serif' }}>Projects</h3>
             {isAdminPanelOpen && (
-              <button className="border border-blue-500 text-blue-500 px-3 py-1 rounded-full text-xs font-medium hover:bg-blue-50">+ New</button>
+              <button onClick={() => navigate('/create-project')} className="border border-blue-500 text-blue-500 px-3 py-1 rounded-full text-xs font-medium hover:bg-blue-50">+ New</button>
             )}
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <span className="w-4 h-4 rounded bg-red-400 inline-block"></span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-900" style={{ fontFamily: 'Roboto, sans-serif' }}>Develop API Endpoints</div>
-                  <div className="text-xs text-gray-500" style={{ fontFamily: 'Roboto, sans-serif' }}>Due date: July 30, 2025</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-4 h-4 rounded bg-purple-400 inline-block"></span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-900">Onboarding Flow</div>
-                  <div className="text-xs text-gray-500">Due date: Sep 30, 2025</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-4 h-4 rounded bg-blue-400 inline-block"></span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-900">Build Dashboard</div>
-                  <div className="text-xs text-gray-500">Due date: Aug 30, 2025</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-4 h-4 rounded bg-red-400 inline-block"></span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-900">Optimize Page Load</div>
-                  <div className="text-xs text-gray-500">Due date: Dec 30, 2025</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-4 h-4 rounded bg-blue-400 inline-block"></span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-900">Build iOS App</div>
-                  <div className="text-xs text-gray-500">Due date: Jan 30, 2025</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-4 h-4 rounded bg-blue-400 inline-block"></span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-900">Build iOS App</div>
-                  <div className="text-xs text-gray-500">Due date: Jan 30, 2025</div>
-                </div>
-                
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-4 h-4 rounded bg-blue-400 inline-block"></span>
-                <div>
-                  <div className="font-semibold text-sm text-gray-900">Build iOS App</div>
-                  <div className="text-xs text-gray-500">Due date: Jan 30, 2025</div>
-                </div>
-                
-              </div>
+              {Array.isArray(dashboardData.projects) && dashboardData.projects.length > 0 ? (
+                dashboardData.projects.map((proj) => (
+                  <div key={proj._id} className="flex items-center gap-3">
+                    <span className={`w-4 h-4 rounded inline-block`} style={{ backgroundColor: proj.color || '#60a5fa' }}></span>
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm text-gray-900" style={{ fontFamily: 'Roboto, sans-serif' }}>{proj.title}</div>
+                      <div className="text-xs text-gray-500" style={{ fontFamily: 'Roboto, sans-serif' }}>
+                        Due date: {proj.endDate ? new Date(proj.endDate).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-500 text-sm">No projects found</div>
+              )}
             </div>
           </div>
         </div>
@@ -390,29 +427,41 @@ const Dashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-6 self-start" style={{ fontFamily: 'Inter, sans-serif' }}>Project Progress</h3>
           <div className="flex flex-col items-center justify-center flex-1 w-full">
             <div className="relative w-72 h-52 flex items-center justify-center" >
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart style={{ marginTop: '-15%' }}>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="100%"
-                    startAngle={180}
-                    endAngle={0}
-                    innerRadius={70}
-                    outerRadius={110}
-                    dataKey="value"
-                    paddingAngle={2}
-                  >
-                    <Cell fill="#3182ce" />
-                    <Cell fill="#4FC3F7" />
-                    <Cell fill="#cbd5e0" />
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute left-1/2 top-[72%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center w-full">
-                <div className="text-4xl font-extrabold text-gray-900 leading-none">41%</div>
-                <div className="text-xl text-blue-500 font-semibold mt-1">Project Ended</div>
-              </div>
+              {dashboardData.projectProgress.completed + dashboardData.projectProgress.inProgress + dashboardData.projectProgress.pending > 0 ? (
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart style={{ marginTop: '-15%' }}>
+                    <Pie
+                      data={[
+                        { name: "Completed", value: dashboardData.projectProgress.completed },
+                        { name: "InProgress", value: dashboardData.projectProgress.inProgress },
+                        { name: "Pending", value: dashboardData.projectProgress.pending },
+                      ]}
+                      cx="50%"
+                      cy="100%"
+                      startAngle={180}
+                      endAngle={0}
+                      innerRadius={70}
+                      outerRadius={110}
+                      dataKey="value"
+                      paddingAngle={2}
+                    >
+                      <Cell fill="#3182ce" />
+                      <Cell fill="#4FC3F7" />
+                      <Cell fill="#cbd5e0" />
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-gray-500">No tasks yet</div>
+              )}
+              {dashboardData.projectProgress.completed + dashboardData.projectProgress.inProgress + dashboardData.projectProgress.pending > 0 && (
+                <div className="absolute left-1/2 top-[72%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center w-full">
+                  <div className="text-3xl font-extrabold text-gray-900 leading-none">
+                    {Math.round((dashboardData.projectProgress.completed / (dashboardData.projectProgress.completed + dashboardData.projectProgress.inProgress + dashboardData.projectProgress.pending)) * 100)}%
+                  </div>
+                  <div className="text-lg text-blue-500 font-semibold mt-1">Tasks Done</div>
+                </div>
+              )}
             </div>
             <div className="flex justify-center gap-4 mt-4">
               <div className="flex items-center gap-2">
@@ -440,189 +489,47 @@ const Dashboard = () => {
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             <div className="flex flex-col gap-4">
-              {/* Member 1 */}
-              <div className="flex items-center gap-3">
-                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Thor Odinson" className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm text-gray-900">Thor Odinson</div>
-                  <div className="text-xs text-gray-500">Working on <span className="font-medium text-gray-900">GitHub Repository</span></div>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Completed</span>
-              </div>
-              {/* Member 2 */}
-              <div className="flex items-center gap-3">
-                <img src="https://randomuser.me/api/portraits/men/33.jpg" alt="Loki Sharma" className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm text-gray-900">Loki Sharma</div>
-                  <div className="text-xs text-gray-500">Working on <span className="font-medium text-gray-900">Time Software</span></div>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Completed</span>
-              </div>
-              {/* Member 3 */}
-              <div className="flex items-center gap-3">
-                <img src="https://randomuser.me/api/portraits/men/34.jpg" alt="Tony Stark" className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm text-gray-900">Tony Stark</div>
-                  <div className="text-xs text-gray-500">Working on <span className="font-medium text-gray-900">Responsive Layout for Homepage</span></div>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Ongoing</span>
-              </div>
-              {/* Member 4 */}
-              <div className="flex items-center gap-3">
-                <img src="https://randomuser.me/api/portraits/men/35.jpg" alt="Happy Verma" className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm text-gray-900">Happy Verma</div>
-                  <div className="text-xs text-gray-500">Working on <span className="font-medium text-gray-900">Management Tools</span></div>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Ongoing</span>
-              </div>
-              {/* Member 5 */}
-              <div className="flex items-center gap-3">
-                <img src="https://randomuser.me/api/portraits/men/36.jpg" alt="Steve Rogers" className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm text-gray-900">Steve Rogers</div>
-                  <div className="text-xs text-gray-500">Working on <span className="font-medium text-gray-900">User Authentication System</span></div>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">Pending</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <img src="https://randomuser.me/api/portraits/men/34.jpg" alt="Tony Stark" className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1">
-                  <div className="font-semibold text-sm text-gray-900">Tony Stark</div>
-                  <div className="text-xs text-gray-500">Working on <span className="font-medium text-gray-900">Responsive Layout for Homepage</span></div>
-                </div>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Ongoing</span>
-              </div>
+              {dashboardData.teamMembers.length > 0 ? (
+                dashboardData.teamMembers.map((member, idx) => (
+                  <div key={member._id || idx} className="flex items-center gap-3">
+                    <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-sm text-gray-900">{member.name}</div>
+                      <div className="text-xs text-gray-500">
+                        Working on{' '}
+                        {member.projectTasks.length > 0 
+                          ? member.projectTasks[0].projectTitle 
+                          : 'No Project'}
+                      </div>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                      member.projectTasks.length > 0 && member.projectTasks[0].tasks.length > 0
+                        ? member.projectTasks[0].tasks.some(t => t.status === 'Completed')
+                          ? member.projectTasks[0].tasks.every(t => t.status === 'Completed')
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                          : 'bg-red-100 text-red-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {member.projectTasks.length > 0 && member.projectTasks[0].tasks.length > 0
+                        ? member.projectTasks[0].tasks.every(t => t.status === 'Completed')
+                          ? 'Completed'
+                          : member.projectTasks[0].tasks.some(t => t.status === 'Completed')
+                          ? 'Ongoing'
+                          : 'Pending'
+                        : 'No Tasks'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-500 text-sm">No team members assigned to projects yet</div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Create Project Modal */}
-      {showProjectModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[100] bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-[90%] md:w-[600px] p-8 relative shadow-2xl">
-            <button
-              onClick={() => setShowProjectModal(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-black"
-            >
-              <X size={22} />
-            </button>
-
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Project</h2>
-
-            <form onSubmit={handleCreateProject} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Project Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={projectForm.title}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
-                  placeholder="Enter project title"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={projectForm.description}
-                  onChange={handleInputChange}
-                  rows="3"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
-                  placeholder="Enter project description"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    name="startDate"
-                    value={projectForm.startDate}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    name="endDate"
-                    value={projectForm.endDate}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Assign Team Members ({projectForm.participants.length} selected)
-                </label>
-                {loadingUsers ? (
-                  <div className="text-sm text-gray-500 py-4">Loading team members...</div>
-                ) : (
-                  <div className="border border-gray-300 rounded-xl max-h-48 overflow-y-auto">
-                    {companyUsers.length === 0 ? (
-                      <div className="text-sm text-gray-500 p-4">No team members available</div>
-                    ) : (
-                      <div className="p-3 space-y-2">
-                        {companyUsers.map((user) => (
-                          <label
-                            key={user._id}
-                            className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={projectForm.participants.includes(user._id)}
-                              onChange={() => handleParticipantToggle(user._id)}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                            />
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                              <div className="text-xs text-gray-500">{user.email}</div>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowProjectModal(false)}
-                  className="px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 rounded-full text-white hover:bg-blue-700"
-                >
-                  Create Project
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Create Project handled via dedicated page */}
     </div>
   )
 }
