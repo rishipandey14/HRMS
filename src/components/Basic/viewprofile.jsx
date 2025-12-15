@@ -1,8 +1,51 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../Basic/pagination";   // ⭐ Your required import
 import { BASE_URL } from "../../utility/Config";
+
+
+import { CHAT_BASE_URL } from "../../utility/Config";
+
+
+// Find or create a direct chat, but do not send a message
+async function findOrCreateDirectChat(loggedInUserId, otherUserId, token) {
+  const authHeader = { headers: { Authorization: `Bearer ${token}` } };
+
+  try {
+    // Fetch existing chats
+    const res = await axios.get(`${CHAT_BASE_URL}/api/chats`, authHeader);
+    const chats = res.data || [];
+
+    // Find a direct chat with exactly these two members
+    const found = chats.find(
+      (c) =>
+        Array.isArray(c.members) &&
+        c.members.length === 2 &&
+        c.members.includes(loggedInUserId) &&
+        c.members.includes(otherUserId)
+    );
+
+    if (found && found._id) {
+      return found._id; // Return existing chat ID
+    }
+  } catch (err) {
+    console.error("Error fetching chats:", err);
+  }
+
+  try {
+    // Create a new chat if none exists
+    const res = await axios.post(
+      `${CHAT_BASE_URL}/api/chats`,
+      { members: [loggedInUserId, otherUserId] },
+      authHeader
+    );
+    return res.data?._id || res.data?.chat?._id || res.data?.chat;
+  } catch (err) {
+    console.error("Error creating chat:", err);
+    return null;
+  }
+}
 
 const mockProjects = Array.from({ length: 50 }, (_, i) => ({
   id: i + 1,
@@ -21,12 +64,23 @@ const statusColors = {
 export default function ProfilePage() {
   const { id: userIdParam } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const itemsPerPage = 5;
 
   const [user, setUser] = useState(location.state?.user || null);
   const token = useMemo(() => (typeof window !== "undefined" ? localStorage.getItem("token") : ""), []);
+  // Get logged in user id from token
+  const loggedInUserId = useMemo(() => {
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.id || payload._id || payload.userId;
+    } catch {
+      return null;
+    }
+  }, [token]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -75,7 +129,20 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex gap-3">
-            <button className="w-full mt-2 text-sm bg-sky-500 text-white border px-3 py-1 rounded-full">
+            <button
+              className="w-full mt-2 text-sm bg-sky-500 text-white border px-3 py-1 rounded-full"
+              onClick={async () => {
+                if (!loggedInUserId || !userIdParam || !token) return;
+                const chatId = await findOrCreateDirectChat(loggedInUserId, userIdParam, token);
+                if (chatId) {
+                  navigate(`/chat`, {
+                    state: { chatId, user },
+                  });
+                } else {
+                  alert("Could not start chat.");
+                }
+              }}
+            >
               Chat
             </button>
             <button className="w-full mt-2 text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition">

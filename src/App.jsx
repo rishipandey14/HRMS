@@ -42,6 +42,7 @@ function App() {
         <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="chat" element={<Chat />} />
+        <Route path="chat/:chatId" element={<Chat />} />
         <Route path="team" element={<Team />} />
         <Route path="jobs" element={<Jobs />} />
         <Route path="jobs/view" element={<JobDetails />} />

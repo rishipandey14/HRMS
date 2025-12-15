@@ -28,13 +28,23 @@ const Dashboard = () => {
     endedProjects: 0,
     runningProjects: 0,
     pendingProjects: 0,
-    projectAnalytics: [],
     projectProgress: { completed: 0, inProgress: 0, pending: 0 },
     teamMembers: [],
     reminders: [],
     totalDailyHours: 0,
     isAdmin: false
   });
+
+  // Static Project Analytics Data
+  const staticProjectAnalytics = [
+    { name: "Sun", value: 25 },
+    { name: "Mon", value: 65 },
+    { name: "Tue", value: 40 },
+    { name: "Wed", value: 55 },
+    { name: "Thu", value: 30 },
+    { name: "Fri", value: 45 },
+    { name: "Sat", value: 80 },
+  ];
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [elapsedTime, setElapsedTime] = useState(0); // Time in seconds
   const appsBtnRef = useRef(null);
@@ -347,8 +357,8 @@ const Dashboard = () => {
         <div className="min-w-[580px] max-w-[650px] w-full flex-1 bg-white p-6 border border-gray-200 shadow-md flex flex-col justify-between" style={{ height: '216px', borderRadius: '30px', opacity: 1 }}>
           <h3 className="text-xl font-semibold text-gray-900 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>Project Analytics</h3>
           <div className="flex-1 flex items-end justify-between w-full h-full">
-            {/* Bar Chart */}
-            {dashboardData.projectAnalytics.map((item, i) => (
+            {/* Bar Chart - Static Data */}
+            {staticProjectAnalytics.map((item, i) => (
               <div key={i} className="flex flex-col items-center justify-end h-full">
                 <div className="w-8 rounded-t-lg" style={{width: `${50}px` , height: `${item.value * 1.5}px`, background: 'linear-gradient(180deg, #4FC3F7 0%, #1976D2 100%)' }}></div>
                 <span className="text-xs text-gray-500 mt-2">{item.name}</span>

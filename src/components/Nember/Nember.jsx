@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import axios from "axios";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { BASE_URL } from "../../utility/Config";
 import { mapUserData } from "../../utility/dataMapper";
 import ViewProfile from "../Basic/viewprofile"; // ✅ IMPORT VIEW PROFILE POPUP
 
 export default function Nember({ projectId: propProjectId, projectParticipants = [] }) {
+  const navigate = useNavigate();
   const { projectId: paramProjectId } = useParams();
   const projectId = propProjectId || paramProjectId; // Use prop if available, else from URL params
   
@@ -144,8 +145,7 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
               <button
                 className="bg-blue-500 text-white w-full text-xs py-3 px-3 rounded-b-2xl hover:bg-blue-600"
                 onClick={() => {
-                  setSelectedMember(member);
-                  setOpenViewProfile(true); // OPEN POPUP
+                  navigate(`/viewprofile/${member._id || member.id || member.email}`);
                 }}
               >
                 View Profile
@@ -270,16 +270,7 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
       )}
 
       {/* ⭐ NEW VIEW PROFILE POPUP ⭐ */}
-      {openViewProfile && selectedMember && (
-  <ViewProfile
-    isOpen={openViewProfile}
-    data={{
-      ...selectedMember,
-      img: `https://i.pravatar.cc/150?img=${selectedMember.img}`,
-    }}
-    onClose={() => setOpenViewProfile(false)}
-  />
-)}
+      {/* ViewProfile popup removed, now using route navigation */}
     </>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { logoutUser } from "../utility/logoutApi";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -140,7 +141,11 @@ const Sidebar = () => {
         </button>
         {/* Logout Button */}
         <button
-          onClick={() => handleNavigation('/logout')}
+          onClick={async () => {
+            const token = localStorage.getItem("token");
+            await logoutUser(token);
+            window.location.href = "/"; // Redirect to login/signup
+          }}
           className={`transition flex items-center justify-center font-semibold cursor-pointer
             ${collapsed
               ? 'w-12 h-12 rounded-full border-2 border-blue-400 text-blue-500 p-0'
