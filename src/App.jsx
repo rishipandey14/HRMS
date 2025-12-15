@@ -21,6 +21,7 @@ import JobDetails from "./components/Job/JobDetails";
 import Setting from "./pages/Settings";
  
 import Plan from "./pages/Plan";
+import TaskUpdates from "./pages/TaskUpdates";
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />
+        <Route path="projects/:projectId/tasks/:taskId/updates" element={<TaskUpdates />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="chat" element={<Chat />} />
         <Route path="chat/:chatId" element={<Chat />} />
