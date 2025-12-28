@@ -48,8 +48,8 @@ A comprehensive Human Resource Management System (HRMS) with advanced task track
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/hrms-task-management.git
-   cd hrms-task-management
+   git clone https://github.com/rishipandey14/HRMS.git
+   cd HRMS
    ```
 
 2. **Install dependencies**
