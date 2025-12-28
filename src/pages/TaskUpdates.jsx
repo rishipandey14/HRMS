@@ -117,14 +117,14 @@ const TaskUpdates = () => {
               </h1>
               {task?.assignedTo && (
                 <p className="text-sm text-gray-500">
-                  Assigned to: {Array.isArray(task.assignedTo) ? task.assignedTo.join(", ") : task.assignedTo}
+                  Assigned to:{task.assignedTo[0]?.name || "Unknown"}
                 </p>
               )}
             </div>
             <div className="text-sm text-gray-600">
               <div>Start: {formatDate(task?.startDate)}</div>
               <div>Due: {formatDate(task?.dueDate)}</div>
-              <div className="mt-1 text-gray-500">Task ID: {task?._id}</div>
+              {/* <div className="mt-1 text-gray-500">Task ID: {task?._id}</div> */}
             </div>
           </div>
         </div>
@@ -163,14 +163,15 @@ const TaskUpdates = () => {
               {updates.map((item) => (
                 <div key={item._id || item.id} className="flex gap-3 rounded-xl bg-gray-50 p-4">
                   <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                    UPD
+                    {item.createdBy?.name || "U"} {console.log(item)}
                   </div>
                   <div className="flex-1">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">{item.status}</p>
+                        {/* <p className="text-sm font-semibold text-gray-800">{item.status}</p> */}
                         <p className="text-xs text-gray-500">
-                          By {item.createdBy || "Someone"}
+                          {item.createdBy?.name || "Unknown"}
+                          {/* {console.log("Item created by -> ", item.createdBy.name)} */}
                         </p>
                       </div>
                       <p className="text-xs text-gray-400">{formatDateTime(item.date || item.createdAt)}</p>
