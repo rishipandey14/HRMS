@@ -4,6 +4,7 @@ import { FaChevronDown } from "react-icons/fa";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { BASE_URL } from "../utility/Config";
+import TableCal from "../components/Basic/tableCal";
 
 const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
   const { projectId: routeProjectId } = useParams();
@@ -16,6 +17,8 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
   const [showEmployeeList, setShowEmployeeList] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [openCalendar, setOpenCalendar] = useState(false);
+  const [activeField, setActiveField] = useState(null); // "start" | "end"
   
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,16 +101,46 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
     }
   };
 
-  return (
-    <div className="h-auto p-4">
-      <div className="w-full">
-        <h1 className="text-3xl font-normal mb-6">Assign New Task</h1>
+  // Calendar helpers
+  const openCalFor = (field) => {
+    setActiveField(field);
+    setOpenCalendar(true);
+  };
 
-        <div className="bg-gray-100 p-4 rounded-3xl mb-6 border border-gray-200 h-auto w-full">
-          <form
-            onSubmit={handleSubmit}
-            className="flex flex-col md:flex-row gap-8 bg-white shadow rounded-xl p-6 w-full border border-gray-200 mt-4"
-          >
+  const handleDateSelect = (date) => {
+    if (!date || !activeField) return;
+
+    // preserve local date (avoid UTC shift) in YYYY-MM-DD
+    const pad = (n) => (n < 10 ? `0${n}` : `${n}`);
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const localDate = `${year}-${month}-${day}`;
+
+    if (activeField === "start") setStartDate(localDate);
+    if (activeField === "end") setEndDate(localDate);
+  };
+
+  const formatDisplayDate = (value) => {
+    if (!value) return "Select date";
+    try {
+      return new Date(value).toDateString();
+    } catch (err) {
+      return value;
+    }
+  };
+
+  return (
+    <>
+      <div className="h-auto p-4">
+        <div className="w-full">
+          <h1 className="text-3xl font-normal mb-6">Assign New Task</h1>
+
+          <div className="bg-gray-100 p-4 rounded-3xl mb-6 border border-gray-200 h-auto w-full">
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-col md:flex-row gap-8 bg-white shadow rounded-xl p-6 w-full border border-gray-200 mt-4"
+            >
             {/* LEFT SIDE FORM */}
             <div className="flex-1 min-w-[350px]">
               <label className="block text-gray-700 font-medium mb-2">
@@ -140,24 +173,24 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex flex-col gap-1">
                   <span className="text-sm text-gray-700">Start Date</span>
-                  <input
-                    type="date"
-                    className="h-10 w-36 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    placeholder="dd/mm/yyyy"
-                  />
+                  <button
+                    type="button"
+                    className="h-10 w-40 px-3 py-2 border border-gray-300 rounded-lg text-left bg-white hover:border-blue-400"
+                    onClick={() => openCalFor("start")}
+                  >
+                    {formatDisplayDate(startDate)}
+                  </button>
                 </div>
 
                 <div className="flex flex-col gap-1">
                   <span className="text-sm text-gray-700">Due Date</span>
-                  <input
-                    type="date"
-                    className="h-10 w-36 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    placeholder="dd/mm/yyyy"
-                  />
+                  <button
+                    type="button"
+                    className="h-10 w-40 px-3 py-2 border border-gray-300 rounded-lg text-left bg-white hover:border-blue-400"
+                    onClick={() => openCalFor("end")}
+                  >
+                    {formatDisplayDate(endDate)}
+                  </button>
                 </div>
               </div>
 
@@ -183,6 +216,7 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
 
             {/* RIGHT: Employee Select */}
             <div className="w-[438px]">
+              <label className="block text-gray-700 font-medium mb-2">Select Employees</label>
               <div
                 className={`bg-white border border-blue-500 shadow overflow-hidden ${
                   showEmployeeList ? "rounded-t-xl" : "rounded-xl"
@@ -258,10 +292,18 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
                 )}
               </div>
             </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Popup calendar (shared with CreateProject) */}
+      <TableCal
+        isOpen={openCalendar}
+        onClose={() => setOpenCalendar(false)}
+        onSelect={handleDateSelect}
+      />
+    </>
   );
 };
 

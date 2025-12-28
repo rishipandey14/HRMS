@@ -20,6 +20,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   const [popupMode, setPopupMode] = useState("Update");
   const [selectedTask, setSelectedTask] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // ⭐ PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,6 +33,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserId(payload.id || payload._id);
+        setIsAdmin(payload.role === "admin" || payload.role === "sadmin");
       } catch (err) {
         console.error("Error parsing token:", err);
       }
@@ -281,6 +283,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           <tbody>
             {paginatedTasks.map((task) => {
               const assignedToUser = isTaskAssignedToUser(task);
+              const canAccessTask = isAdmin || assignedToUser;
               return (
               <tr
                 key={task._id}
@@ -289,13 +292,13 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 <td className="px-4 lg:px-6 py-5 rounded-l-lg">
                   <button
                     type="button"
-                    disabled={!assignedToUser}
+                    disabled={!canAccessTask}
                     className={`text-left w-full ${
-                      assignedToUser 
+                      canAccessTask 
                         ? "hover:text-blue-600 cursor-pointer" 
                         : ""
                     }`}
-                    onClick={() => assignedToUser && goToUpdatesPage(task)}
+                    onClick={() => canAccessTask && goToUpdatesPage(task)}
                   >
                     {task.description}
                   </button>
@@ -341,10 +344,10 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 {/* UPDATE BUTTON */}
                 <td className="px-4 lg:px-6 py-5">
                   <button
-                    disabled={!assignedToUser}
-                    onClick={() => assignedToUser && openPopup(task, "Update")}
+                    disabled={!canAccessTask}
+                    onClick={() => canAccessTask && openPopup(task, "Update")}
                     className={`text-sm px-3 py-1 rounded-full transition ${
-                      assignedToUser
+                      canAccessTask
                         ? "text-blue-500 border border-blue-500 hover:bg-blue-50 cursor-pointer"
                         : ""
                     }`}
@@ -356,10 +359,10 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 {/* SUBMIT BUTTON */}
                 <td className="px-4 lg:px-6 py-5">
                   <button
-                    disabled={!assignedToUser}
-                    onClick={() => assignedToUser && openPopup(task, "Submit")}
+                    disabled={!canAccessTask}
+                    onClick={() => canAccessTask && openPopup(task, "Submit")}
                     className={`text-sm px-3 py-1 rounded-full transition ${
-                      assignedToUser
+                      canAccessTask
                         ? "text-blue-500 border border-blue-500 hover:bg-blue-50 cursor-pointer"
                         : ""
                     }`}
