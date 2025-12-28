@@ -19,10 +19,24 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMode, setPopupMode] = useState("Update");
   const [selectedTask, setSelectedTask] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   // ⭐ PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 5;
+
+  // ⭐ GET CURRENT USER ID
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setCurrentUserId(payload.id || payload._id);
+      } catch (err) {
+        console.error("Error parsing token:", err);
+      }
+    }
+  }, []);
 
   // ⭐ FETCH TASKS FROM API
   useEffect(() => {
@@ -210,6 +224,18 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedTasks = filteredTasks.slice(startIndex, startIndex + rowsPerPage);
 
+  // ⭐ CHECK IF TASK IS ASSIGNED TO CURRENT USER
+  const isTaskAssignedToUser = (task) => {
+    if (!currentUserId) return false;
+    
+    return (
+      task.assignedTo &&
+      (Array.isArray(task.assignedTo)
+        ? task.assignedTo.some(user => (user._id || user) === currentUserId)
+        : (task.assignedTo._id || task.assignedTo) === currentUserId)
+    );
+  };
+
   if (loading) {
     return (
       <div className="w-full p-6 flex justify-center items-center">
@@ -253,16 +279,23 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           </thead>
 
           <tbody>
-            {paginatedTasks.map((task) => (
+            {paginatedTasks.map((task) => {
+              const assignedToUser = isTaskAssignedToUser(task);
+              return (
               <tr
                 key={task._id}
-                className="bg-white text-sm text-gray-800 rounded-lg shadow-sm"
+                className={`bg-white text-sm text-gray-800 rounded-lg shadow-sm`}
               >
                 <td className="px-4 lg:px-6 py-5 rounded-l-lg">
                   <button
                     type="button"
-                    className="text-left w-full hover:text-blue-600"
-                    onClick={() => goToUpdatesPage(task)}
+                    disabled={!assignedToUser}
+                    className={`text-left w-full ${
+                      assignedToUser 
+                        ? "hover:text-blue-600 cursor-pointer" 
+                        : ""
+                    }`}
+                    onClick={() => assignedToUser && goToUpdatesPage(task)}
                   >
                     {task.description}
                   </button>
@@ -308,8 +341,13 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 {/* UPDATE BUTTON */}
                 <td className="px-4 lg:px-6 py-5">
                   <button
-                    onClick={() => openPopup(task, "Update")}
-                    className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition"
+                    disabled={!assignedToUser}
+                    onClick={() => assignedToUser && openPopup(task, "Update")}
+                    className={`text-sm px-3 py-1 rounded-full transition ${
+                      assignedToUser
+                        ? "text-blue-500 border border-blue-500 hover:bg-blue-50 cursor-pointer"
+                        : ""
+                    }`}
                   >
                     Updates
                   </button>
@@ -318,14 +356,20 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 {/* SUBMIT BUTTON */}
                 <td className="px-4 lg:px-6 py-5">
                   <button
-                    onClick={() => openPopup(task, "Submit")}
-                    className="text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition"
+                    disabled={!assignedToUser}
+                    onClick={() => assignedToUser && openPopup(task, "Submit")}
+                    className={`text-sm px-3 py-1 rounded-full transition ${
+                      assignedToUser
+                        ? "text-blue-500 border border-blue-500 hover:bg-blue-50 cursor-pointer"
+                        : ""
+                    }`}
                   >
                     Submit
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
