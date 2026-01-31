@@ -32,7 +32,7 @@ const CreateProject = () => {
           headers: { Authorization: `Bearer ${token}` }
         });
         const users = (response.data.users || []).map(u => ({
-          _id: u._id,
+          id: u.id, // Use 'id' from Sequelize
           name: u.name,
           role: u.role || 'Member',
           img: u.avatar || u.image || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name || 'User')}`
@@ -154,10 +154,10 @@ const CreateProject = () => {
                     <span className="text-xs text-gray-500">No employees selected</span>
                   ) : (
                     employees
-                      .filter(emp => selectedEmployeeIds.includes(emp._id))
+                      .filter(emp => selectedEmployeeIds.includes(emp.id))
                       .map((emp, idx) => (
                         <img
-                          key={emp._id}
+                          key={emp.id}
                           src={emp.img}
                           alt={emp.name}
                           className={`w-8 h-8 rounded-full border-2 border-white object-cover ${idx > 0 ? '-ml-2' : ''}`}
@@ -214,12 +214,12 @@ const CreateProject = () => {
                       >
                         <input
                           type="checkbox"
-                          checked={selectedEmployeeIds.includes(emp._id)}
+                          checked={selectedEmployeeIds.includes(emp.id)}
                           onChange={() => {
                             setSelectedEmployeeIds(prev => (
-                              prev.includes(emp._id)
-                                ? prev.filter(id => id !== emp._id)
-                                : [...prev, emp._id]
+                              prev.includes(emp.id)
+                                ? prev.filter(id => id !== emp.id)
+                                : [...prev, emp.id]
                             ))
                           }}
                           className="mr-4 w-4 h-4 accent-blue-600"
