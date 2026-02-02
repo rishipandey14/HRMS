@@ -18,7 +18,7 @@ export const mapProjectData = (apiProject) => {
 
   return {
     // API field names (keep original for reference)
-    _id: apiProject._id,
+    id: apiProject.id,
     title: apiProject.title,
     participants: apiProject.participants,
     description: apiProject.description,
@@ -48,7 +48,7 @@ export const mapTaskData = (apiTask) => {
 
   return {
     // API field names (keep original for reference)
-    _id: apiTask._id,
+    id: apiTask.id,
     title: apiTask.title,
     assignedTo: apiTask.assignedTo,
     status: apiTask.status,

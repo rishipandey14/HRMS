@@ -29,14 +29,29 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
     const fetchEmployees = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get(`${BASE_URL}/projects/${projectId}`, {
+        
+        // First, get the project to see which participants are assigned
+        const projectRes = await axios.get(`${BASE_URL}/projects/${projectId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         
-        const participants = res.data.participants || [];
-        setEmployees(participants);
-        if (participants.length > 0) {
-          setSelectedEmployee(participants[0]._id);
+        const participantIds = projectRes.data.participants || [];
+        
+        // Fetch all company users
+        const usersRes = await axios.get(`${BASE_URL}/company/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        const allUsers = usersRes.data.users || [];
+        
+        // Filter users who are participants in this project
+        const participantUsers = allUsers.filter(user => 
+          participantIds.includes(user.id)
+        );
+        
+        setEmployees(participantUsers);
+        if (participantUsers.length > 0) {
+          setSelectedEmployee(participantUsers[0].id);
         }
       } catch (err) {
         console.error("Error fetching employees:", err);
@@ -71,7 +86,7 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
         status: "Not Started",
       };
 
-      await axios.post(`${BASE_URL}/tasks/${projectId}`, taskData, {
+      await axios.post(`${BASE_URL}/projects/${projectId}/tasks`, taskData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -229,7 +244,7 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
                 >
                   <span className="font-medium text-gray-700">
                     {!loading && selectedEmployee
-                      ? employees.find(e => e._id === selectedEmployee)?.name || "Select Employee"
+                      ? employees.find(e => e.id === selectedEmployee)?.name || "Select Employee"
                       : "Select Employee"}
                   </span>
                   <FaChevronDown
@@ -243,10 +258,10 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
                   <div className="w-full">
                     {employees.map((emp, idx) => (
                       <div
-                        key={emp._id}
+                        key={emp.id}
                         className={`flex items-center px-6 py-4 cursor-pointer 
                         ${
-                          selectedEmployee === emp._id
+                          selectedEmployee === emp.id
                             ? "bg-blue-500"
                             : "hover:bg-gray-100"
                         }
@@ -256,7 +271,7 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
                             : ""
                         }`}
                         onClick={() => {
-                          setSelectedEmployee(emp._id);
+                          setSelectedEmployee(emp.id);
                           setShowEmployeeList(false);
                         }}
                       >
@@ -269,7 +284,7 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
                         <div>
                           <div
                             className={`font-semibold ${
-                              selectedEmployee === emp._id
+                              selectedEmployee === emp.id
                                 ? "text-white"
                                 : "text-gray-800"
                             }`}
@@ -278,7 +293,7 @@ const AssignTask = ({ projectId: propProjectId, onSuccess, onCancel }) => {
                           </div>
                           <div
                             className={`text-xs ${
-                              selectedEmployee === emp._id
+                              selectedEmployee === emp.id
                                 ? "text-blue-100"
                                 : "text-gray-500"
                             }`}

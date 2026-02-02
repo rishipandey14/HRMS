@@ -53,7 +53,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           return;
         }
 
-        const res = await axios.get(`${BASE_URL}/tasks/${projectId}`, {
+        const res = await axios.get(`${BASE_URL}/projects/${projectId}/tasks`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -163,8 +163,8 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   };
 
   const goToUpdatesPage = (task) => {
-    if (!projectId || !task?._id) return;
-    navigate(`/projects/${projectId}/tasks/${task._id}/updates`, { state: { task } });
+    if (!projectId || !task?.id) return;
+    navigate(`/projects/${projectId}/tasks/${task.id}/updates`, { state: { task } });
   };
 
   // ⭐ HANDLE TASK ACTIONS (updates vs final submit)
@@ -186,7 +186,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
       if (popupMode === "Submit") {
         // Final submission: mark task as completed
         const res = await axios.put(
-          `${BASE_URL}/tasks/${projectId}/${taskId}`,
+          `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
           { 
             status: "Completed",
             submissionNotes: description,
@@ -197,7 +197,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
         // Update local task list to reflect completion
         setTasks((prevTasks) =>
           prevTasks.map((task) =>
-            task._id === taskId ? { ...task, status: "Completed" } : task
+            task.id === taskId ? { ...task, status: "Completed" } : task
           )
         );
 
@@ -206,7 +206,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
         // Regular update: add an update entry without closing the task
         const currentStatus = selectedTask?.status || "In Progress";
         await axios.post(
-          `${BASE_URL}/tasks/${projectId}/${taskId}/updates`,
+          `${BASE_URL}/projects/${projectId}/tasks/${taskId}/updates`,
           {
             status: currentStatus,
             note: description,
@@ -286,7 +286,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
               const canAccessTask = isAdmin || assignedToUser;
               return (
               <tr
-                key={task._id}
+                key={task.id}
                 className={`bg-white text-sm text-gray-800 rounded-lg shadow-sm`}
               >
                 <td className="px-4 lg:px-6 py-5 rounded-l-lg">
@@ -308,7 +308,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                   <div className="flex items-center gap-2">
                     <img
                       src={`https://i.pravatar.cc/150?img=${Math.abs(
-                        task._id.charCodeAt(0)
+                        (task.id || "1").toString().charCodeAt(0)
                       ) % 100}`}
                       alt="Assignee"
                       className="w-8 h-8 rounded-full"
