@@ -98,8 +98,16 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           (task) =>
             task.assignedTo &&
             (Array.isArray(task.assignedTo)
-              ? task.assignedTo.some(user => (user._id || user) === userId)
-              : (task.assignedTo._id || task.assignedTo) === userId)
+              ? task.assignedTo.some(user => {
+                  // Handle both user objects and user IDs
+                  if (typeof user === 'object') {
+                    return (user.id || user._id) === userId;
+                  }
+                  return user === userId;
+                })
+              : (typeof task.assignedTo === 'object' 
+                  ? (task.assignedTo.id || task.assignedTo._id) === userId
+                  : task.assignedTo === userId))
         );
       }
     }
@@ -184,12 +192,23 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
       };
 
       if (popupMode === "Submit") {
-        // Final submission: mark task as completed
+        // Final submission: mark task as completed AND create an update entry
         const res = await axios.put(
           `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
           { 
             status: "Completed",
             submissionNotes: description,
+          },
+          commonHeaders
+        );
+
+        // Also create an update entry so it appears in the updates history
+        await axios.post(
+          `${BASE_URL}/projects/${projectId}/tasks/${taskId}/updates`,
+          {
+            status: "Completed",
+            note: description,
+            date: new Date(),
           },
           commonHeaders
         );
@@ -233,8 +252,16 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
     return (
       task.assignedTo &&
       (Array.isArray(task.assignedTo)
-        ? task.assignedTo.some(user => (user._id || user) === currentUserId)
-        : (task.assignedTo._id || task.assignedTo) === currentUserId)
+        ? task.assignedTo.some(user => {
+            // Handle both user objects and user IDs
+            if (typeof user === 'object') {
+              return (user.id || user._id) === currentUserId;
+            }
+            return user === currentUserId;
+          })
+        : (typeof task.assignedTo === 'object' 
+            ? (task.assignedTo.id || task.assignedTo._id) === currentUserId
+            : task.assignedTo === currentUserId))
     );
   };
 
@@ -315,9 +342,9 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                     />
                     <span className="truncate">
                       {Array.isArray(task.assignedTo) && task.assignedTo.length > 0
-                        ? typeof task.assignedTo[0] === "string"
-                          ? task.assignedTo[0].slice(0, 15) + "..."
-                          : task.assignedTo[0]?.name || "Unassigned"
+                        ? typeof task.assignedTo[0] === "object"
+                          ? task.assignedTo[0]?.name || "Unassigned"
+                          : task.assignedTo[0]
                         : "Unassigned"}
                     </span>
                   </div>
@@ -390,7 +417,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
         isOpen={popupOpen}
         onClose={() => setPopupOpen(false)}
         title={popupTitle}
-        taskId={selectedTask?._id}
+        taskId={selectedTask?.id}
         onSubmitTask={handleSubmitTask}
       />
     </div>

@@ -244,7 +244,7 @@ const ProjectPage = () => {
         ) : activeTab === "task" ? (
           <Task projectId={projectId} taskFilter={taskFilter} />
         ) : (
-          <Nember projectId={projectId} projectParticipants={project.participants} />
+          <Nember projectId={projectId} projectParticipants={project.participantDetails} />
         )}
       </div>
 

@@ -52,10 +52,10 @@ const TaskUpdates = () => {
 
         const taskRequest = task
           ? Promise.resolve({ data: task })
-          : axios.get(`${BASE_URL}/tasks/${projectId}/${taskId}`, authConfig);
+          : axios.get(`${BASE_URL}/projects/${projectId}/tasks/${taskId}`, authConfig);
 
         const updatesRequest = axios.get(
-          `${BASE_URL}/tasks/${projectId}/${taskId}/updates`,
+          `${BASE_URL}/projects/${projectId}/tasks/${taskId}/updates`,
           authConfig
         );
 
@@ -160,28 +160,51 @@ const TaskUpdates = () => {
 
           {!loading && !error && updates.length > 0 && (
             <div className="max-h-[520px] space-y-3 overflow-y-auto pr-1">
-              {updates.map((item) => (
-                <div key={item._id || item.id} className="flex gap-3 rounded-xl bg-gray-50 p-4">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                    {item.createdBy?.name || "U"} {console.log(item)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        {/* <p className="text-sm font-semibold text-gray-800">{item.status}</p> */}
-                        <p className="text-xs text-gray-500">
-                          {item.createdBy?.name || "Unknown"}
-                          {/* {console.log("Item created by -> ", item.createdBy.name)} */}
-                        </p>
+              {updates.map((item, index) => {
+                try {
+                  const creatorName = item?.createdByUser?.name || item?.createdBy?.name || "Unknown";
+                  const firstLetter = creatorName.charAt(0).toUpperCase() || "U";
+                  
+                  return (
+                    <div key={item.id || `update-${index}`} className="flex gap-3 rounded-xl bg-gray-50 p-4">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-blue-600 font-semibold">
+                        {firstLetter}
                       </div>
-                      <p className="text-xs text-gray-400">{formatDateTime(item.date || item.createdAt)}</p>
+                      <div className="flex-1">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              {creatorName}
+                            </p>
+                          </div>
+                          <p className="text-xs text-gray-400">{formatDateTime(item.date || item.createdAt)}</p>
+                        </div>
+                        {item.note && (
+                          <p className="mt-2 text-sm text-gray-700">{item.note}</p>
+                        )}
+                      </div>
                     </div>
-                    {item.note && (
-                      <p className="mt-2 text-sm text-gray-700">{item.note}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  );
+                } catch (err) {
+                  console.error("Error rendering update item:", err, item);
+                  return (
+                    <div key={item.id || `update-${index}`} className="flex gap-3 rounded-xl bg-gray-50 p-4">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold">
+                        U
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs text-gray-500">Unknown</p>
+                          <p className="text-xs text-gray-400">{formatDateTime(item.date || item.createdAt)}</p>
+                        </div>
+                        {item.note && (
+                          <p className="mt-2 text-sm text-gray-700">{item.note}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+              })}
             </div>
           )}
         </div>
