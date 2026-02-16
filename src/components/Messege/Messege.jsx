@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { Send, Plus, MoreVertical } from "lucide-react";
+import { Send, Plus, MoreVertical, CornerUpLeft, Check, CheckCheck } from "lucide-react";
 import { CHAT_BASE_URL, BASE_URL } from "../../utility/Config";
 
 const parseToken = (token) => {
@@ -28,9 +28,10 @@ const Messege = ({ initialChatId }) => {
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [newChatMessage, setNewChatMessage] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [replyToMessage, setReplyToMessage] = useState(null);
   
   // User cache to avoid repeated API calls - stored in state to trigger re-renders
   const [userCache, setUserCache] = useState({});
@@ -44,10 +45,45 @@ const Messege = ({ initialChatId }) => {
     [token]
   );
 
+  const getId = (obj) => {
+    if (!obj) return null;
+    if (typeof obj === 'string') return obj;
+    return obj._id || obj.id || null;
+  };
+
   const normalizeUser = (u) => {
     if (!u) return { _id: "unknown", name: "Unknown" };
     if (typeof u === "string") return { _id: u, name: u };
     return { _id: u._id || u.id, name: u.name || u.email || "Unknown", email: u.email };
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString();
+  };
+
+  const formatTime = (value) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const getReplyPreview = (msg) => {
+    if (!msg) return "";
+    if (msg.content) return msg.content;
+    if (msg.text) return msg.text;
+    return "Message";
+  };
+
+  const getReadStatus = (msg) => {
+    if (Array.isArray(msg.unreadBy)) {
+      if (msg.unreadBy.length === 0) return "read";
+      return "delivered";
+    }
+    return "sent";
   };
 
   // Fetch ALL company users once when chats exist (for displaying names)
@@ -84,11 +120,12 @@ const Messege = ({ initialChatId }) => {
   }, [token, authHeader, chats.length]);
 
   const contactDisplay = (chat) => {
+    const chatId = getId(chat);
     if (chat?.isGroup) {
       return {
         title: chat.groupName || `Group (${chat.members?.length || 0})`,
         subtitle: `${chat.members?.length || 0} members`,
-        avatar: chat.groupAvatar || `https://i.pravatar.cc/150?u=${chat._id}`,
+        avatar: chat.groupAvatar || `https://i.pravatar.cc/150?u=${chatId || "group"}`,
       };
     }
     
@@ -104,7 +141,10 @@ const Messege = ({ initialChatId }) => {
   };
 
   const upsertMessage = useCallback((incoming) => {
-    if (!incoming?._id) return;
+    if (!incoming) return;
+    // normalize id field to _id for client-side consistency
+    if (!incoming._id && incoming.id) incoming._id = incoming.id;
+    if (!incoming._id) return;
     
     // Cache sender info if it's an object
     if (incoming.senderId && typeof incoming.senderId === "object") {
@@ -139,7 +179,7 @@ const Messege = ({ initialChatId }) => {
         const chatIdFromState = location.state?.chatId;
         const targetChatId = chatIdFromState || initialChatId;
         if (targetChatId) {
-          const chatFromState = list.find((chat) => chat._id === targetChatId);
+          const chatFromState = list.find((chat) => (chat._id || chat.id) === targetChatId);
           if (chatFromState) {
             setSelectedChat(chatFromState);
           }
@@ -184,14 +224,18 @@ const Messege = ({ initialChatId }) => {
   // socket connect
   useEffect(() => {
     if (!token) return;
+    // Prevent creating multiple sockets (React StrictMode mounts twice in dev)
+    if (socketRef.current) return;
+
     const socket = io(CHAT_BASE_URL, {
       auth: { token },
       transports: ["websocket"],
+      autoConnect: false,
     });
 
     socketRef.current = socket;
 
-    // Register all listeners before emitting connect_user
+    // Register all listeners before connecting / emitting connect_user
     socket.on("connect", () => {
       console.log("Socket connected");
       socket.emit("connect_user");
@@ -200,10 +244,13 @@ const Messege = ({ initialChatId }) => {
     socket.on("receive_message", (msg) => {
       console.log("Received message:", msg);
       upsertMessage(msg);
-      
+
       // Auto-mark as seen if the chat is currently open
-      if (selectedChat?._id === msg.chatId && msg.senderId !== currentUserId) {
-        socket.emit("message_seen", msg._id);
+      const currentChatId = getId(selectedChat);
+      const incomingChatId = msg.chatId || msg.chatId;
+      const messageId = msg._id || msg.id;
+      if (currentChatId && incomingChatId && currentChatId === incomingChatId && (msg.senderId !== currentUserId)) {
+        socket.emit("message_seen", { messageId, chatId: incomingChatId });
       }
     });
 
@@ -236,7 +283,7 @@ const Messege = ({ initialChatId }) => {
     socket.on("chat_messages_seen", ({ chatId, userId, count }) => {
       console.log(`${count} messages seen in chat ${chatId} by ${userId}`);
       // Update all messages in current chat
-      if (selectedChat?._id === chatId) {
+      if ((selectedChat?._id || selectedChat?.id) === chatId) {
         setMessages((prev) =>
           prev.map((m) => ({
             ...m,
@@ -254,29 +301,40 @@ const Messege = ({ initialChatId }) => {
       console.log("Socket disconnected");
     });
 
+    // finally connect after listeners are registered
+    socket.connect();
+
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      // Only disconnect the same socket instance created by this effect
+      if (socketRef.current === socket) {
+        socket.disconnect();
+        socketRef.current = null;
+      }
     };
-  }, [token, upsertMessage, selectedChat?._id, currentUserId]);
+  }, [token, upsertMessage, selectedChat, currentUserId]);
 
   useEffect(() => {
     const fetchMessages = async () => {
-      if (!selectedChat?._id) return;
+      const chatId = getId(selectedChat);
+      if (!chatId) return;
       setLoadingMessages(true);
       try {
-        const res = await axios.get(
-          `${CHAT_BASE_URL}/api/messages/${selectedChat._id}`,
-          authHeader
-        );
-        const msgs = res.data || [];
+        const res = await axios.get(`${CHAT_BASE_URL}/api/messages/${chatId}`, authHeader);
+        const msgs = (res.data || []).map(m => ({ ...m, _id: m._id || m.id }));
         setMessages(msgs);
-        
-        // ensure room joined for realtime
-        socketRef.current?.emit("join_chat", selectedChat._id);
-        
+
+        // ensure room joined for realtime (send object as server expects {chatId})
+        socketRef.current?.emit("join_chat", { chatId });
+        console.debug("join_chat", { chatId });
+
         // Mark all messages in this chat as seen via socket (real-time)
-        socketRef.current?.emit("mark_chat_seen", selectedChat._id);
+        for (const m of msgs) {
+          const messageId = m._id || m.id;
+          if (m.senderId && m.senderId !== currentUserId) {
+            socketRef.current?.emit("message_seen", { messageId, chatId });
+            console.debug("message_seen", { messageId, chatId });
+          }
+        }
       } catch (err) {
         console.error("Error loading messages", err);
         setMessages([]);
@@ -285,15 +343,27 @@ const Messege = ({ initialChatId }) => {
       }
     };
     fetchMessages();
-  }, [selectedChat?._id, authHeader]);
+  }, [selectedChat, authHeader]);
+
+  useEffect(() => {
+    setReplyToMessage(null);
+  }, [selectedChat]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !selectedChat?._id) return;
-    const payload = { chatId: selectedChat._id, content: input.trim(), type: "text" };
+    const chatId = getId(selectedChat);
+    if (!input.trim() || !chatId) return;
+    const payload = {
+      chatId,
+      content: input.trim(),
+      type: "text",
+      replyToId: replyToMessage?._id || replyToMessage?.id || null,
+    };
     try {
       // Send via socket only; backend socket handler persists and emits receive_message
       socketRef.current?.emit("send_message", payload);
+      console.debug("send_message", payload);
       setInput("");
+      setReplyToMessage(null);
     } catch (err) {
       console.error("Send message failed", err);
     }
@@ -301,27 +371,44 @@ const Messege = ({ initialChatId }) => {
 
   const startDirectChat = async () => {
     if (!selectedUserId) return;
-    const body = {
-      receiverId: selectedUserId,
-      content: newChatMessage.trim() || "Hi",
-      type: "text",
-    };
     try {
-      const res = await axios.post(`${CHAT_BASE_URL}/api/messages`, body, authHeader);
-      const chatId = res.data?.chatId || res.data?.chat?._id || res.data?.chat || body.chatId;
+      const trimmed = newChatMessage.trim();
+      let chatId = null;
+
+      if (trimmed) {
+        const body = {
+          receiverId: selectedUserId,
+          content: trimmed,
+          type: "text",
+        };
+        const res = await axios.post(`${CHAT_BASE_URL}/api/messages`, body, authHeader);
+        chatId = res.data?.chatId || res.data?.chat?._id || res.data?.chat || body.chatId;
+        console.debug("startDirectChat", { chatId, receiverId: body.receiverId });
+      } else if (currentUserId) {
+        const res = await axios.post(
+          `${CHAT_BASE_URL}/api/chats`,
+          { members: [currentUserId, selectedUserId] },
+          authHeader
+        );
+        chatId = res.data?._id || res.data?.id || res.data?.chatId || res.data?.chat || null;
+        console.debug("startDirectChat (no message)", { chatId, receiverId: selectedUserId });
+      }
+
+      if (!chatId) return;
       // refresh chats and focus the one with this chatId
       const chatsRes = await axios.get(`${CHAT_BASE_URL}/api/chats`, authHeader);
       const list = chatsRes.data || [];
       setChats(list);
-      const found = list.find((c) => c._id === chatId) || list[0];
+      const found = list.find((c) => (c._id || c.id) === chatId) || list[0];
       setSelectedChat(found || null);
       if (chatId) {
         const msgs = await axios.get(`${CHAT_BASE_URL}/api/messages/${chatId}`, authHeader);
-        setMessages(msgs.data || []);
+        const fetched = (msgs.data || []).map(m => ({ ...m, _id: m._id || m.id }));
+        setMessages(fetched || []);
       }
       setOpenNewChat(false);
       setNewChatMessage("");
-      setSelectedUserId("");
+      setSelectedUserId(null);
     } catch (err) {
       console.error("Start chat failed", err);
     }
@@ -331,8 +418,8 @@ const Messege = ({ initialChatId }) => {
     if (!chatId || !window.confirm("Are you sure you want to delete this chat?")) return;
     try {
       await axios.delete(`${CHAT_BASE_URL}/api/chats/${chatId}`, authHeader);
-      setChats((prev) => prev.filter((chat) => chat._id !== chatId));
-      if (selectedChat?._id === chatId) {
+      setChats((prev) => prev.filter((chat) => (chat._id || chat.id) !== chatId));
+      if ((selectedChat?._id || selectedChat?.id) === chatId) {
         setSelectedChat(null);
         setMessages([]);
       }
@@ -380,11 +467,14 @@ const Messege = ({ initialChatId }) => {
         <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto translucent-scrollbar pr-1">
           {chats.map((chat) => {
             const contact = contactDisplay(chat);
+            const chatKey = chat._id || chat.id;
+            const chatIdCompare = chat._id || chat.id;
+            const otherMemberId = chat?.members?.find((m) => m !== currentUserId);
             return (
               <div
-                key={chat._id}
+                key={chatKey}
                 className={`flex items-center justify-between p-3 rounded-lg cursor-pointer hover:bg-gray-100 transition ${
-                  selectedChat?._id === chat._id ? "bg-gray-200" : ""
+                  (selectedChat?._id || selectedChat?.id) === chatIdCompare ? "bg-gray-200" : ""
                 }`}
                 onClick={() => {
                   setSelectedChat(chat);
@@ -399,9 +489,9 @@ const Messege = ({ initialChatId }) => {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (chat.isGroup) {
-                        navigate(`/projects/${chat._id}`);
+                        navigate(`/projects/${chatIdCompare}`);
                       } else {
-                        navigate(`/profile/${chat.userId}`);
+                        if (otherMemberId) navigate(`/profile/${otherMemberId}`);
                       }
                     }}
                   />
@@ -409,9 +499,9 @@ const Messege = ({ initialChatId }) => {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (chat.isGroup) {
-                        navigate(`/projects/${chat._id}`);
+                        navigate(`/projects/${chatIdCompare}`);
                       } else {
-                        navigate(`/profile/${chat.userId}`);
+                        if (otherMemberId) navigate(`/profile/${otherMemberId}`);
                       }
                     }}
                   >
@@ -424,14 +514,14 @@ const Messege = ({ initialChatId }) => {
                     className="p-2 rounded-full hover:bg-gray-200"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setOpenMenuId((prev) => (prev === chat._id ? null : chat._id));
+                      setOpenMenuId((prev) => (prev === chatKey ? null : chatKey));
                     }}
                   >
                     <MoreVertical size={16} />
                   </button>
                   <div
                     className={`absolute right-0 mt-2 w-32 bg-white border border-gray-300 rounded-lg shadow-lg ${
-                      openMenuId === chat._id ? "" : "hidden"
+                      openMenuId === chatKey ? "" : "hidden"
                     }`}
                   >
                     <button
@@ -439,7 +529,7 @@ const Messege = ({ initialChatId }) => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenMenuId(null);
-                        deleteChat(chat._id);
+                        deleteChat(chatIdCompare);
                       }}
                     >
                       Delete Chat
@@ -469,25 +559,41 @@ const Messege = ({ initialChatId }) => {
             </div>
 
             <div className="flex-1 px-4 sm:px-6 py-4 overflow-y-auto bg-white">
+              <div className="flex flex-col items-center gap-2 text-sm text-gray-500 mb-4">
+                <div className="px-4 py-2 rounded-2xl bg-yellow-50 text-yellow-800 text-center">
+                  Messages are end to end encrypted. Only people in this chat can read or share them.
+                </div>
+              </div>
               {loadingMessages && (
                 <p className="text-sm text-gray-500">Loading messages...</p>
               )}
-              {!loadingMessages && messages.length === 0 && (
+              {/* {!loadingMessages && messages.length === 0 && (
                 <p className="text-sm text-gray-500">No messages yet.</p>
-              )}
+              )} */}
               {!loadingMessages &&
-                messages.map((msg) => {
+                messages.map((msg, index) => {
                   const senderId = msg.senderId;
                   const senderInfo = userCache[senderId] || { _id: senderId, name: "Loading..." };
                   const fromMe = senderId === currentUserId;
                   const avatar = `https://i.pravatar.cc/150?u=${senderId}`;
+                  const currentDate = formatDate(msg.createdAt || msg.updatedAt);
+                  const prevDate = index > 0 ? formatDate(messages[index - 1].createdAt || messages[index - 1].updatedAt) : "";
+                  const showDate = currentDate && currentDate !== prevDate;
+                  const readStatus = getReadStatus(msg);
                   return (
-                    <div
-                      key={msg._id}
-                      className={`flex items-end gap-1 mb-3 ${
-                        fromMe ? "justify-end" : "justify-start"
-                      }`}
-                    >
+                    <div key={msg._id || msg.id}>
+                      {showDate && (
+                        <div className="flex justify-center my-2">
+                          <div className="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600">
+                            {currentDate}
+                          </div>
+                        </div>
+                      )}
+                      <div
+                        className={`flex items-end gap-1 mb-3 group ${
+                          fromMe ? "justify-end" : "justify-start"
+                        }`}
+                      >
                       {!fromMe && (
                         <img src={avatar} className="w-6 h-6 rounded-full flex-shrink-0" alt={senderInfo.name} title={senderInfo.email || senderInfo.name} />
                       )}
@@ -496,25 +602,70 @@ const Messege = ({ initialChatId }) => {
                           <p className="text-xs text-gray-500 px-3 mb-1">{senderInfo.name}</p>
                         )}
                         <div
-                          className={`text-sm px-3 py-1.5 rounded-xl ${
+                          className={`text-sm px-3 py-1.5 rounded-xl relative ${
                             fromMe
                               ? "bg-blue-500 text-white rounded-br-none"
                               : "bg-gray-100 text-black rounded-bl-none"
                           }`}
                           title={senderInfo.email || senderInfo.name}
                         >
-                          {msg.content || msg.text}
+                          {msg.replyTo && (
+                            <div className={`text-[11px] mb-1 px-2 py-1 rounded-lg ${
+                              fromMe ? "bg-blue-600/40" : "bg-gray-200"
+                            }`}>
+                              <div className="font-semibold">{msg.replyTo?.senderId === currentUserId ? "You" : senderInfo.name}</div>
+                              <div className="truncate">{getReplyPreview(msg.replyTo)}</div>
+                            </div>
+                          )}
+                          <div className="whitespace-pre-wrap">{msg.content || msg.text}</div>
+                          <div className="flex items-center gap-1 justify-end mt-1 text-[10px] text-gray-200">
+                            <span className={fromMe ? "text-white/80" : "text-gray-400"}>
+                              {formatTime(msg.createdAt || msg.updatedAt)}
+                            </span>
+                            {fromMe && (
+                              <span className={readStatus === "read" ? "text-blue-300" : "text-white/70"}>
+                                {readStatus === "sent" && <Check className="w-3 h-3" />}
+                                {readStatus === "delivered" && <CheckCheck className="w-3 h-3" />}
+                                {readStatus === "read" && <CheckCheck className="w-3 h-3" />}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
+                        onClick={() => setReplyToMessage(msg)}
+                        aria-label="Reply"
+                        type="button"
+                      >
+                        <CornerUpLeft className="w-4 h-4" />
+                      </button>
                       {fromMe && (
                         <img src={avatar} className="w-6 h-6 rounded-full flex-shrink-0" alt="You" title="You" />
                       )}
+                      </div>
                     </div>
                   );
                 })}
             </div>
 
             <div className="p-4 border-t border-gray-200">
+              {replyToMessage && (
+                <div className="mb-2 px-4 py-2 rounded-2xl bg-gray-100 flex items-center justify-between">
+                  <div className="text-sm">
+                    <div className="text-xs text-gray-500">Replying to</div>
+                    <div className="font-medium truncate">{getReplyPreview(replyToMessage)}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-gray-400 hover:text-gray-600"
+                    onClick={() => setReplyToMessage(null)}
+                    aria-label="Cancel reply"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               <div className="flex bg-gray-100 rounded-full px-4 py-2">
                 <input
                   type="text"
@@ -570,24 +721,27 @@ const Messege = ({ initialChatId }) => {
                       .toLowerCase()
                       .includes(memberSearch.toLowerCase())
                   )
-                  .map((m) => (
-                    <label
-                      key={m._id}
-                      className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50"
-                    >
-                      <input
-                        type="radio"
-                        name="new-chat-user"
-                        value={m._id}
-                        checked={selectedUserId === m._id}
-                        onChange={() => setSelectedUserId(m._id)}
-                      />
+                  .map((m, idx) => {
+                    const uid = m._id || m.id || m.email || String(idx);
+                    return (
+                      <label
+                        key={uid}
+                        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50"
+                      >
+                        <input
+                          type="radio"
+                          name="new-chat-user"
+                          value={uid}
+                          checked={selectedUserId === uid}
+                          onChange={() => setSelectedUserId(uid)}
+                        />
                       <div>
                         <p className="text-sm font-medium">{m.name || m.email}</p>
                         <p className="text-xs text-gray-500">{m.email}</p>
                       </div>
-                    </label>
-                  ))}
+                      </label>
+                    );
+                  })}
                 {!membersLoading && members.length === 0 && (
                   <p className="p-3 text-sm text-gray-500">No members found.</p>
                 )}

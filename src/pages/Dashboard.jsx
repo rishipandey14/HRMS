@@ -358,8 +358,8 @@ const Dashboard = () => {
           <h3 className="text-xl font-semibold text-gray-900 mb-2" style={{ fontFamily: 'Inter, sans-serif' }}>Project Analytics</h3>
           <div className="flex-1 flex items-end justify-between w-full h-full">
             {/* Bar Chart - Static Data */}
-            {staticProjectAnalytics.map((item, i) => (
-              <div key={i} className="flex flex-col items-center justify-end h-full">
+            {staticProjectAnalytics.map((item) => (
+              <div key={item.name} className="flex flex-col items-center justify-end h-full">
                 <div className="w-8 rounded-t-lg" style={{width: `${50}px` , height: `${item.value * 1.5}px`, background: 'linear-gradient(180deg, #4FC3F7 0%, #1976D2 100%)' }}></div>
                 <span className="text-xs text-gray-500 mt-2">{item.name}</span>
               </div>
@@ -405,8 +405,8 @@ const Dashboard = () => {
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             <div className="flex flex-col gap-3">
               {Array.isArray(dashboardData.projects) && dashboardData.projects.length > 0 ? (
-                dashboardData.projects.map((proj) => (
-                  <div key={proj._id} className="flex items-center gap-3">
+                dashboardData.projects.map((proj, projIdx) => (
+                  <div key={proj._id || proj.id || proj.title || projIdx} className="flex items-center gap-3">
                     <span className={`w-4 h-4 rounded inline-block`} style={{ backgroundColor: proj.color || '#60a5fa' }}></span>
                     <div className="flex-1">
                       <div className="font-semibold text-sm text-gray-900" style={{ fontFamily: 'Roboto, sans-serif' }}>{proj.title}</div>
@@ -445,9 +445,9 @@ const Dashboard = () => {
                       dataKey="value"
                       paddingAngle={2}
                     >
-                      <Cell fill="#3182ce" />
-                      <Cell fill="#4FC3F7" />
-                      <Cell fill="#cbd5e0" />
+                        <Cell key="completed" fill="#3182ce" />
+                        <Cell key="inprogress" fill="#4FC3F7" />
+                        <Cell key="pending" fill="#cbd5e0" />
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
@@ -491,7 +491,7 @@ const Dashboard = () => {
             <div className="flex flex-col gap-4">
               {dashboardData.teamMembers.length > 0 ? (
                 dashboardData.teamMembers.map((member, idx) => (
-                  <div key={member._id || idx} className="flex items-center gap-3">
+                  <div key={member._id || member.email || idx} className="flex items-center gap-3">
                     <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full object-cover" />
                     <div className="flex-1">
                       <div className="font-semibold text-sm text-gray-900">{member.name}</div>
