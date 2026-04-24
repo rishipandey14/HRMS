@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { Link } from 'react-router-dom';
 
 const LeaveCard = ({ label, total, consumed, accent }) => (
   <div className={`rounded-xl p-3 border ${accent ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-100'} flex flex-col gap-0.5`}>
@@ -279,12 +280,16 @@ export default function Calender() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-semibold rounded-xl py-2.5 transition-colors">
-                  Apply Leave
-                </button>
-                <button className="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 text-[11px] font-semibold rounded-xl py-2.5 transition-colors leading-tight text-center">
-                  Regularization &amp; Permission
-                </button>
+                <Link to="/leaveApply">
+                  <button className="w-full bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-semibold rounded-xl py-2.5 transition-colors">
+                    Apply Leave
+                  </button>
+                </Link>
+                <Link to="/RegularizationApply">
+                  <button className="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 text-[11px] font-semibold rounded-xl py-2.5 transition-colors leading-tight text-center">
+                    Regularization &amp; Permission
+                  </button>
+                </Link>
               </div>
             </div>
 

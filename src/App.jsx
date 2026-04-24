@@ -12,6 +12,7 @@ import MobileBlockPage from "./utility/MobileBlockPage";
 import Login from "./pages/Login";
 import OrgSetup from "./components/Company/orgsetup";
 import ViewProfile from "./components/Basic/viewprofile";
+import OW_Dashboard from "./pages/ow_dashboard";
 
 
 import ContactPage from "./pages/ContactPage";
@@ -22,6 +23,8 @@ import Setting from "./pages/Settings";
  
 import Plan from "./pages/Plan";
 import TaskUpdates from "./pages/TaskUpdates";
+import LeaveManagement from "./components/Leave/leave_apply";
+import RegularizationWindow from "./components/Requlization/requlization_Apply";
 
 function App() {
   return (
@@ -39,6 +42,7 @@ function App() {
         }
       >
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="/wdashboard" element={<OW_Dashboard />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="projects/:projectId/tasks/:taskId/updates" element={<TaskUpdates />} />
@@ -49,6 +53,9 @@ function App() {
         <Route path="jobs" element={<Jobs />} />
         <Route path="jobs/view" element={<JobDetails />} />
         <Route path="create-project" element={<CreateProject />} />
+        <Route path="leaveApply" element={<LeaveManagement />} />
+        <Route path="RegularizationApply" element={<RegularizationWindow/>} />
+        
 
         {/* profile route */}
         <Route path="viewprofile/:id" element={<ViewProfile />} />

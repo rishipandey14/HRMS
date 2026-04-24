@@ -9,7 +9,8 @@ const Team = () => {
     <div className="p-4">
       
       {/* Top Toggle Button */}
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-3xl font-semibold p-4">Team Members</h2>
         <button
           onClick={() => setView(view === "card" ? "org" : "card")}
           className="px-4 py-2 border rounded-full"
