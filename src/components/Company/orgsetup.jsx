@@ -99,7 +99,7 @@ export default function OnboardingFlow() {
       const response = await axios.post(`${BASE_URL}/company/signup`, signupData);
 
       if (response.status === 201 && response.data) {
-        const { token, company } = response.data;
+        const { token, company, subscription } = response.data;
 
         // Save token and company info to localStorage
         if (token) {
@@ -107,6 +107,9 @@ export default function OnboardingFlow() {
           localStorage.setItem("companyId", company._id);
           localStorage.setItem("companyName", company.companyName);
           localStorage.setItem("companyEmail", company.email);
+          if (subscription) {
+            localStorage.setItem("companySubscription", JSON.stringify(subscription));
+          }
           setCompanyId(company._id);
         }
 

@@ -1,11 +1,12 @@
  import React, { useState } from 'react'
  
-import { User, CreditCard, Puzzle, ShieldCheck, Trash2 } from "lucide-react";
+import { User, CreditCard, Puzzle, ShieldCheck, Trash2, KeyRound } from "lucide-react";
 import ProfileSetting from './ProfileSetting';
 import Delete from './Delete';
 import Billing from './Billing';
 import Integrations from './Integrations';
 import SecuritySettings from './SecuritySettings';
+import AccessControl from './AccessControl';
 
 const Setting = () => {
   const [activetab, setactivetab] = useState("profile");
@@ -13,6 +14,7 @@ const Setting = () => {
   const menuitems = [
     { key: "profile", label: "Profile Setting", icon: User },
     { key: "billing", label: "Billing", icon: CreditCard },
+    { key: "access", label: "Access Control", icon: KeyRound },
     { key: "integrations", label: "Integrations", icon: Puzzle },
     { key: "security", label: "Security", icon: ShieldCheck },
     { key: "delete", label: "Delete Account", danger: true, icon: Trash2 },
@@ -48,6 +50,7 @@ const Setting = () => {
         {activetab === "profile" && <ProfileSetting />}
         {activetab === "delete" && <Delete />}
         {activetab === "billing" && <Billing />}
+        {activetab === "access" && <AccessControl />}
         {activetab === "integrations" && <Integrations />}
         {activetab === "security" && <SecuritySettings/>}
       </main>

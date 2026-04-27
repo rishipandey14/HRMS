@@ -5,11 +5,14 @@ import App from './App.jsx'
  
 
 import { BrowserRouter } from 'react-router-dom';
+import { RbacProvider } from './context/RbacContext.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <RbacProvider>
+        <App />
+      </RbacProvider>
     </BrowserRouter>
   </StrictMode>,
 )
