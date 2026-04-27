@@ -1,23 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import axios from "axios";
-import { BASE_URL } from "../../utility/Config";
+import React, { useState, useRef, useEffect } from "react";
 
 const COLORS = [
-  "#2196F3", "#4CAF50", "#FF9800", "#9C27B0", "#E91E63",
-  "#3F51B5", "#009688", "#FFC107", "#795548", "#00BCD4",
-  "#FF5722", "#673AB7", "#8BC34A", "#607D8B", "#F44336"
+  "#2196F3","#4CAF50","#FF9800","#9C27B0","#E91E63",
+  "#3F51B5","#009688","#FFC107","#795548","#00BCD4",
+  "#FF5722","#673AB7","#8BC34A","#607D8B","#F44336"
 ];
 
-const CARD_W = 240;
-const CARD_H = 88;
+const EMPLOYEES = [
+  { name: "John Doe", role: "Manager", empId: "101" },
+  { name: "Jane Smith", role: "Lead", empId: "102" },
+  { name: "Alex Brown", role: "Engineer", empId: "103" },
+];
+
+const CARD_W = 220;
+const CARD_H = 80;
 const H_GAP = 80;
 const V_GAP = 20;
-
-const titleCase = (value = "") =>
-  String(value)
-    .split("_")
-    .map((item) => item.charAt(0).toUpperCase() + item.slice(1))
-    .join(" ");
 
 function countAll(node) {
   return node.children.reduce((a, c) => a + 1 + countAll(c), 0);
@@ -31,7 +29,8 @@ function subtreeHeight(node) {
   return Math.max(CARD_H, childrenH);
 }
 
-function NodeTree({ node, level, onToggle }) {
+function NodeTree({ node, level, onEdit, onAdd, onRemove, onToggle, rootId }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const sh = subtreeHeight(node);
   const childrenVisible = !node.collapsed && node.children.length > 0;
 
@@ -47,83 +46,109 @@ function NodeTree({ node, level, onToggle }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", position: "relative" }}>
+      {/* Card */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: sh, position: "relative", minWidth: CARD_W }}>
-        <div
-          style={{
-            width: CARD_W,
-            height: CARD_H,
-            display: "flex",
-            alignItems: "center",
-            background: "#fff",
-            border: "1px solid #e8edf2",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-            borderRadius: 12,
-            position: "relative",
-            userSelect: "none",
-          }}
-        >
+        <div style={{
+          width: CARD_W, height: CARD_H,
+          display: "flex", alignItems: "center",
+          background: "#fff",
+          border: "1px solid #e8edf2",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+          borderRadius: 12,
+          position: "relative",
+          userSelect: "none",
+        }}>
+          {/* Color band */}
           <div style={{ width: 14, height: "100%", background: COLORS[level % COLORS.length], borderRadius: "12px 0 0 12px", flexShrink: 0 }} />
 
-          <div
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: "50%",
-              background: `${COLORS[level % COLORS.length]}33`,
-              margin: "0 8px",
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
-              fontWeight: "bold",
-              color: COLORS[level % COLORS.length],
-            }}
-          >
-            {node.name.charAt(0).toUpperCase()}
+          {/* Avatar */}
+          <div style={{
+            width: 38, height: 38, borderRadius: "50%",
+            background: `${COLORS[level % COLORS.length]}33`,
+            margin: "0 8px", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 14, fontWeight: "bold", color: COLORS[level % COLORS.length],
+          }}>
+            {node.name.charAt(0)}
           </div>
 
+          {/* Info */}
           <div style={{ flex: 1, overflow: "hidden" }}>
             <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{node.name}</div>
-            <div style={{ fontSize: 11, color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {node.role}
-            </div>
-            {node.meta && (
-              <div style={{ fontSize: 10, color: "#999" }}>{node.meta}</div>
+            <div style={{ fontSize: 11, color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{node.role}</div>
+            <div style={{ fontSize: 10, color: "#999" }}>ID: {node.empId}</div>
+          </div>
+
+          {/* 3-dot menu */}
+          <div style={{ position: "absolute", right: 6, top: 6 }}>
+            <button
+              onClick={() => setMenuOpen((m) => !m)}
+              style={{ border: "none", background: "transparent", fontSize: 16, cursor: "pointer", color: "#888", padding: "2px 4px" }}
+            >
+              ⋮
+            </button>
+            {menuOpen && (
+              <div style={{ position: "absolute", right: 0, top: 22, background: "#fff", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", zIndex: 200, minWidth: 90, overflow: "hidden" }}>
+                <div
+                  onClick={() => { onEdit(node); setMenuOpen(false); }}
+                  style={{ padding: "8px 14px", cursor: "pointer", fontSize: 13 }}
+                >
+                  ✏️ Edit
+                </div>
+                {node.id !== rootId && (
+                  <div
+                    onClick={() => { onRemove(node.id); setMenuOpen(false); }}
+                    style={{ padding: "8px 14px", cursor: "pointer", fontSize: 13, color: "#e53935" }}
+                  >
+                    🗑 Remove
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
+          {/* Add child button */}
+          <button
+            onClick={() => onAdd(node.id)}
+            style={{
+              position: "absolute", right: -14, top: "50%", transform: "translateY(-50%)",
+              width: 26, height: 26, borderRadius: "50%", border: "none",
+              background: COLORS[level % COLORS.length], color: "#fff",
+              cursor: "pointer", fontSize: 16,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.2)", zIndex: 10,
+            }}
+          >
+            +
+          </button>
+
+          {/* Collapse toggle */}
           {node.children.length > 0 && (
             <button
               onClick={() => onToggle(node.id)}
               style={{
-                position: "absolute",
-                right: -14,
-                bottom: -10,
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                border: "2px solid #bbb",
-                background: "#fff",
-                cursor: "pointer",
-                fontSize: 10,
-                fontWeight: "bold",
-                color: "#555",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 11,
+                position: "absolute", right: -14, bottom: -10,
+                width: 22, height: 22, borderRadius: "50%",
+                border: "2px solid #bbb", background: "#fff",
+                cursor: "pointer", fontSize: 10, fontWeight: "bold", color: "#555",
+                display: "flex", alignItems: "center", justifyContent: "center", zIndex: 11,
               }}
             >
-              {node.collapsed ? `+${countAll(node)}` : "-"}
+              {node.collapsed ? `+${countAll(node)}` : "−"}
             </button>
           )}
         </div>
       </div>
 
+      {/* Connectors + children */}
       {childrenVisible && childOffsets.length > 0 && (
         <div style={{ display: "flex", flexDirection: "row", position: "relative" }}>
-          <svg style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }} width={H_GAP} height={sh}>
+          {/* SVG curved connectors */}
+          <svg
+            style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }}
+            width={H_GAP}
+            height={sh}
+          >
             {childOffsets.map(({ child, y, h }) => {
               const childMidY = y + h / 2;
               const parentMidY = sh / 2;
@@ -139,9 +164,19 @@ function NodeTree({ node, level, onToggle }) {
             })}
           </svg>
 
+          {/* Children */}
           <div style={{ marginLeft: H_GAP, display: "flex", flexDirection: "column", gap: V_GAP }}>
             {childOffsets.map(({ child }) => (
-              <NodeTree key={child.id} node={child} level={level + 1} onToggle={onToggle} />
+              <NodeTree
+                key={child.id}
+                node={child}
+                level={level + 1}
+                onEdit={onEdit}
+                onAdd={onAdd}
+                onRemove={onRemove}
+                onToggle={onToggle}
+                rootId={rootId}
+              />
             ))}
           </div>
         </div>
@@ -150,119 +185,20 @@ function NodeTree({ node, level, onToggle }) {
   );
 }
 
-const cloneNode = (node) => ({
-  ...node,
-  collapsed: Boolean(node.collapsed),
-  children: Array.isArray(node.children) ? node.children.map(cloneNode) : [],
-});
-
-const buildDisplayTree = (roleTree = [], unassignedUsers = []) => {
-  const toPersonNode = (user) => ({
-    id: `user-${user.userId}`,
-    name: user.name,
-    role: titleCase(user.roleName || "Unassigned"),
-    meta: user.email || "",
-    membersCount: 0,
-    collapsed: false,
-    children: [],
-  });
-
-  // Build person-only flow: empty role levels are skipped, descendants are promoted upward.
-  const toPeopleNodes = (role) => {
-    const childPeople = Array.isArray(role.children)
-      ? role.children.flatMap((childRole) => toPeopleNodes(childRole))
-      : [];
-
-    const usersInRole = Array.isArray(role.users) ? role.users : [];
-    if (usersInRole.length === 0) {
-      return childPeople;
-    }
-
-    const peopleNodes = usersInRole.map((user) => toPersonNode(user));
-
-    if (peopleNodes.length > 0) {
-      peopleNodes[0].children = childPeople;
-    }
-
-    return peopleNodes;
-  };
-
-  const peopleByHierarchy = Array.isArray(roleTree)
-    ? roleTree.flatMap((role) => toPeopleNodes(role))
-    : [];
-
-  const unassignedNodes = Array.isArray(unassignedUsers)
-    ? unassignedUsers.map((user) => ({
-        ...toPersonNode(user),
-        role: "Unassigned",
-      }))
-    : [];
-
-  const rootChildren = [...peopleByHierarchy, ...unassignedNodes];
-
-  if (rootChildren.length === 0) {
-    return {
-      id: "root-empty",
-      name: "No People Found",
-      role: "No assigned people",
-      membersCount: 0,
-      collapsed: false,
-      children: [],
-    };
-  }
-
-  return {
-    id: "root-company",
-    name: "Company People",
-    role: "Reporting Flow",
-    membersCount: 0,
-    collapsed: false,
-    children: rootChildren,
-  };
-};
-
 export default function OrgChart() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 40, y: 40 });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [tree, setTree] = useState({
-    id: "root-loading",
-    name: "Loading",
-    role: "People Flow",
-    membersCount: 0,
-    collapsed: false,
-    children: [],
-  });
-
+  const [editingNode, setEditingNode] = useState(null);
   const containerRef = useRef(null);
   const isPanning = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
 
-  const totalPeople = useMemo(() => countAll(tree), [tree]);
+  const [tree, setTree] = useState({
+    id: 1, name: "Dianne Russell", role: "Director", empId: "001",
+    collapsed: false, children: [],
+  });
 
-  const fetchRoleTree = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${BASE_URL}/rbac/orgchart`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setTree(buildDisplayTree(response.data?.tree || [], response.data?.unassignedUsers || []));
-    } catch (fetchError) {
-      setError(fetchError.response?.data?.msg || "Failed to load organization chart");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRoleTree();
-  }, []);
-
+  // Non-passive wheel listener to prevent page scroll
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -279,49 +215,57 @@ export default function OrgChart() {
     isPanning.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
   };
-
   const onMouseMove = (e) => {
     if (!isPanning.current) return;
     setPan((p) => ({ x: p.x + e.clientX - lastMouse.current.x, y: p.y + e.clientY - lastMouse.current.y }));
     lastMouse.current = { x: e.clientX, y: e.clientY };
   };
+  const onMouseUp = () => { isPanning.current = false; };
 
-  const onMouseUp = () => {
-    isPanning.current = false;
-  };
-
-  const toggleCollapse = (targetId) => {
+  const updateTree = (callback) => {
     setTree((prev) => {
-      const next = cloneNode(prev);
-      const toggle = (node) => {
-        if (String(node.id) === String(targetId)) {
-          node.collapsed = !node.collapsed;
-          return;
-        }
-        node.children.forEach(toggle);
-      };
-
-      toggle(next);
-      return next;
+      const copy = JSON.parse(JSON.stringify(prev));
+      callback(copy);
+      return copy;
     });
   };
 
+  const addNode = (id) => updateTree((root) => {
+    const add = (n) => {
+      if (n.id === id) {
+        n.children.push({ id: Date.now(), name: "New Member", role: "Role", empId: Math.floor(Math.random() * 1000).toString(), collapsed: false, children: [] });
+      } else n.children.forEach(add);
+    };
+    add(root);
+  });
+
+  const removeNode = (id) => {
+    if (id === tree.id) return;
+    updateTree((root) => {
+      const rem = (n) => { n.children = n.children.filter((c) => c.id !== id); n.children.forEach(rem); };
+      rem(root);
+    });
+  };
+
+  const toggleCollapse = (id) => updateTree((root) => {
+    const tog = (n) => { if (n.id === id) n.collapsed = !n.collapsed; else n.children.forEach(tog); };
+    tog(root);
+  });
+
+  const applyEdit = (emp) => {
+    updateTree((root) => {
+      const ed = (n) => {
+        if (n.id === editingNode.id) { n.name = emp.name; n.role = emp.role; n.empId = emp.empId; }
+        else n.children.forEach(ed);
+      };
+      ed(root);
+    });
+    setEditingNode(null);
+  };
+
   return (
-    <div style={{ width: "100%", height: "70vh", overflow: "hidden", position: "relative", background: "#f0f4f8", borderRadius: 14 }}>
-      <div style={{ position: "absolute", top: 10, left: 12, zIndex: 20, background: "rgba(255,255,255,0.9)", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px", fontSize: 12, color: "#334155" }}>
-        <div>People: {totalPeople}</div>
-        <div>Zoom: {Math.round(zoom * 100)}%</div>
-      </div>
-
-      <div style={{ position: "absolute", top: 10, right: 12, zIndex: 20, display: "flex", gap: 8 }}>
-        <button
-          onClick={fetchRoleTree}
-          style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 8, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}
-        >
-          Reload
-        </button>
-      </div>
-
+    <div style={{ width: "100vw", height: "70vh", overflow: "hidden", position: "relative", background: "#f0f4f8" }}>
+      {/* Canvas */}
       <div
         ref={containerRef}
         style={{ width: "100%", height: "100%", overflowY: "auto", overflowX: "hidden", cursor: "grab" }}
@@ -330,26 +274,27 @@ export default function OrgChart() {
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
       >
-        <div
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: "0 0",
-            display: "inline-block",
-            padding: "20px",
-          }}
-        >
-          {loading ? (
-            <div style={{ color: "#64748b", fontSize: 14 }}>Loading company people flow...</div>
-          ) : error ? (
-            <div style={{ color: "#b91c1c", fontSize: 14 }}>{error}</div>
-          ) : (
-            <NodeTree node={tree} level={0} onToggle={toggleCollapse} />
-          )}
+        <div style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transformOrigin: "0 0",
+          display: "inline-block",
+          padding: "20px",
+        }}>
+          <NodeTree
+            node={tree}
+            level={0}
+            onEdit={setEditingNode}
+            onAdd={addNode}
+            onRemove={removeNode}
+            onToggle={toggleCollapse}
+            rootId={tree.id}
+          />
         </div>
       </div>
 
+      {/* Zoom + Reset controls */}
       <div style={{ position: "fixed", right: 20, bottom: 20, display: "flex", flexDirection: "column", gap: 8, zIndex: 300 }}>
-        {[["+", 0.1], ["-", -0.1]].map(([label, delta]) => (
+        {[["＋", 0.1], ["−", -0.1]].map(([label, delta]) => (
           <button
             key={label}
             onClick={() => setZoom((z) => Math.min(Math.max(z + delta, 0.3), 2.5))}
@@ -359,15 +304,39 @@ export default function OrgChart() {
           </button>
         ))}
         <button
-          onClick={() => {
-            setZoom(1);
-            setPan({ x: 40, y: 40 });
-          }}
-          style={{ width: 42, height: 42, borderRadius: 10, border: "1px solid #ddd", background: "#fff", fontSize: 12, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}
+          onClick={() => { setZoom(1); setPan({ x: 40, y: 40 }); }}
+          style={{ width: 42, height: 42, borderRadius: 10, border: "1px solid #ddd", background: "#fff", fontSize: 16, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}
         >
-          Reset
+          ↺
         </button>
       </div>
+
+      {/* Edit modal */}
+      {editingNode && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 24, minWidth: 280, boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ marginBottom: 16, fontSize: 16 }}>Select Employee</h3>
+            {EMPLOYEES.map((emp) => (
+              <div
+                key={emp.empId}
+                onClick={() => applyEdit(emp)}
+                style={{ padding: "10px 12px", borderRadius: 8, marginBottom: 6, cursor: "pointer", border: "1px solid #eee" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+              >
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
+                <div style={{ fontSize: 12, color: "#888" }}>{emp.role} · {emp.empId}</div>
+              </div>
+            ))}
+            <button
+              onClick={() => setEditingNode(null)}
+              style={{ marginTop: 8, width: "100%", padding: "8px", border: "1px solid #ddd", borderRadius: 8, cursor: "pointer", background: "#f9f9f9" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

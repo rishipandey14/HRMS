@@ -42,18 +42,18 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<PermissionRoute requiredPermission="dashboard.view"><Dashboard /></PermissionRoute>} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="/wdashboard" element={<OW_Dashboard />} />
-        <Route path="projects" element={<PermissionRoute requiredPermission="project.view"><Projects /></PermissionRoute>} />
-        <Route path="projects/:projectId" element={<PermissionRoute requiredPermission="project.view"><ProjectPage /></PermissionRoute>} />
-        <Route path="projects/:projectId/tasks/:taskId/updates" element={<PermissionRoute requiredPermission="update.view"><TaskUpdates /></PermissionRoute>} />
+        <Route path="projects" element={<Projects />} />
+        <Route path="projects/:projectId" element={<ProjectPage />} />
+        <Route path="projects/:projectId/tasks/:taskId/updates" element={<TaskUpdates />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="chat" element={<PermissionRoute requiredPermission="chat.view"><Chat /></PermissionRoute>} />
         <Route path="chat/:chatId" element={<PermissionRoute requiredPermission="chat.view"><Chat /></PermissionRoute>} />
         <Route path="team" element={<PermissionRoute requiredPermission="user.view"><Team /></PermissionRoute>} />
         <Route path="jobs" element={<Jobs />} />
         <Route path="jobs/view" element={<JobDetails />} />
-        <Route path="create-project" element={<PermissionRoute requiredPermission="project.create"><CreateProject /></PermissionRoute>} />
+        <Route path="create-project" element={<CreateProject />} />
         <Route path="leaveApply" element={<LeaveManagement />} />
         <Route path="RegularizationApply" element={<RegularizationWindow/>} />
         
