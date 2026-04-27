@@ -18,9 +18,10 @@ export const mapProjectData = (apiProject) => {
 
   return {
     // API field names (keep original for reference)
-    _id: apiProject._id,
+    id: apiProject.id,
     title: apiProject.title,
     participants: apiProject.participants,
+    participantDetails: apiProject.participantDetails, // Include full user objects
     description: apiProject.description,
     startDate: apiProject.startDate,
     endDate: apiProject.endDate,
@@ -48,7 +49,7 @@ export const mapTaskData = (apiTask) => {
 
   return {
     // API field names (keep original for reference)
-    _id: apiTask._id,
+    id: apiTask.id,
     title: apiTask.title,
     assignedTo: apiTask.assignedTo,
     status: apiTask.status,
@@ -74,8 +75,9 @@ export const mapUserData = (apiUser) => {
   if (!apiUser) return null;
 
   return {
-    // API field names
-    _id: apiUser._id,
+    // API field names (Sequelize uses 'id', MongoDB uses '_id')
+    id: apiUser.id || apiUser._id,
+    _id: apiUser._id || apiUser.id,
     name: apiUser.name,
     email: apiUser.email,
     role: apiUser.role,

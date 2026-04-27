@@ -9,12 +9,60 @@ export default function NotificationDropdown({ isOpen, onClose }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const upsertNotification = (incoming) => {
+    setNotifications((prev) => {
+      const index = prev.findIndex((item) => item.id === incoming.id);
+      if (index === -1) {
+        return [incoming, ...prev].slice(0, 50);
+      }
+
+      const next = [...prev];
+      next[index] = { ...next[index], ...incoming };
+      return next;
+    });
+  };
+
   // Fetch notifications when dropdown opens
   useEffect(() => {
     if (isOpen) {
       fetchNotifications();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return;
+    }
+
+    const streamUrl = `${BASE_URL}/notifications/stream?token=${encodeURIComponent(token)}`;
+    const eventSource = new EventSource(streamUrl, { withCredentials: true });
+
+    const handleNotificationEvent = (event) => {
+      try {
+        const payload = JSON.parse(event.data || "{}");
+        if (!payload.notification) {
+          return;
+        }
+        upsertNotification(payload.notification);
+      } catch (error) {
+        console.error("Error parsing notification stream event:", error);
+      }
+    };
+
+    eventSource.addEventListener("notification.created", handleNotificationEvent);
+    eventSource.addEventListener("notification.updated", handleNotificationEvent);
+
+    eventSource.onerror = (error) => {
+      console.error("Notification stream disconnected:", error);
+    };
+
+    return () => {
+      eventSource.removeEventListener("notification.created", handleNotificationEvent);
+      eventSource.removeEventListener("notification.updated", handleNotificationEvent);
+      eventSource.close();
+    };
+  }, []);
 
   const fetchNotifications = async () => {
     setLoading(true);
@@ -50,7 +98,7 @@ export default function NotificationDropdown({ isOpen, onClose }) {
       
       // Mark notification as read after approval
       await axios.patch(
-        `${BASE_URL}/notifications/${notification._id}/read`,
+        `${BASE_URL}/notifications/${notification.id}/read`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -73,7 +121,7 @@ export default function NotificationDropdown({ isOpen, onClose }) {
       await Promise.all(
         unreadNotifications.map(n => 
           axios.patch(
-            `${BASE_URL}/notifications/${n._id}/read`,
+            `${BASE_URL}/notifications/${n.id}/read`,
             {},
             {
               headers: { Authorization: `Bearer ${token}` },
@@ -179,7 +227,7 @@ export default function NotificationDropdown({ isOpen, onClose }) {
                 <div className="divide-y divide-[#DDD9D9]">
                   {listToShow.length > 0 ? (
                     listToShow.map((n) => (
-                      <div key={n._id} className="py-4">
+                      <div key={n.id} className="py-4">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">

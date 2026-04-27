@@ -8,6 +8,7 @@ import Team from "./pages/Team";
 import Jobs from "./pages/Jobs";
 import CreateProject from "./pages/CreateProject";
 import ProtectedRoute from "./router/ProtectedRoute";
+import PermissionRoute from "./router/PermissionRoute";
 import MobileBlockPage from "./utility/MobileBlockPage";
 import Login from "./pages/Login";
 import OrgSetup from "./components/Company/orgsetup";
@@ -47,9 +48,9 @@ function App() {
         <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="projects/:projectId/tasks/:taskId/updates" element={<TaskUpdates />} />
         <Route path="calendar" element={<Calendar />} />
-        <Route path="chat" element={<Chat />} />
-        <Route path="chat/:chatId" element={<Chat />} />
-        <Route path="team" element={<Team />} />
+        <Route path="chat" element={<PermissionRoute requiredPermission="chat.view"><Chat /></PermissionRoute>} />
+        <Route path="chat/:chatId" element={<PermissionRoute requiredPermission="chat.view"><Chat /></PermissionRoute>} />
+        <Route path="team" element={<PermissionRoute requiredPermission="user.view"><Team /></PermissionRoute>} />
         <Route path="jobs" element={<Jobs />} />
         <Route path="jobs/view" element={<JobDetails />} />
         <Route path="create-project" element={<CreateProject />} />
@@ -61,12 +62,13 @@ function App() {
         <Route path="viewprofile/:id" element={<ViewProfile />} />
 
         {/* setting routes */}
-        <Route path="settings" element={<Setting />} />
+        <Route path="settings" element={<PermissionRoute requiredPermission="settings.view"><Setting /></PermissionRoute>} />
 
        
         <Route path="contact" element={<ContactPage />} />
 
         <Route path="plan" element={<Plan />} />
+        <Route path="Plan" element={<Plan />} />
       </Route>
     </Routes>
   );

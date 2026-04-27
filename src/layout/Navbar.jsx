@@ -2,12 +2,12 @@ import { Bell, Search } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import NotificationDropdown from "./NotificationDropdown";
-import axios from "axios";
-import { BASE_URL } from "../utility/Config";
+import { useRbac } from "../context/RbacContext";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const [openNoti, setOpenNoti] = useState(false);
+  const { role, hasPermission } = useRbac();
   const [userData, setUserData] = useState({
     name: "Loading...",
     role: "User",
@@ -24,7 +24,7 @@ const Navbar = () => {
           
           setUserData({
             name: payload.email?.split('@')[0] || "User",
-            role: payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User',
+            role: role?.name || (payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User'),
             email: payload.email || ""
           });
         }
@@ -53,7 +53,7 @@ const Navbar = () => {
       <div className="flex items-center gap-6 relative">
 
         {/* Notification Bell */}
-        <div className="relative">
+        {hasPermission('notification.view') && <div className="relative">
           <div
             onClick={() => setOpenNoti((prev) => !prev)}
             className="w-10 h-10 rounded-full bg-white flex items-center justify-center cursor-pointer"
@@ -70,7 +70,7 @@ const Navbar = () => {
               onClose={() => setOpenNoti(false)}
             />
           </div>
-        </div>
+        </div>}
 
         {/* Divider */}
         <div className="h-6 border-l border-gray-300" />

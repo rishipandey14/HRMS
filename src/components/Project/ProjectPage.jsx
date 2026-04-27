@@ -51,7 +51,7 @@ const ProjectPage = () => {
           setLoading(false);
           return;
         }
-
+        console.log("*********Project id -> ", projectId);
         const res = await axios.get(`${BASE_URL}/projects/${projectId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -133,12 +133,12 @@ const ProjectPage = () => {
           <div className="flex items-center mt-3">
             {project.team?.slice(0, 3).map((member, index) => (
               <img
-                key={member._id}
+                key={`${member}-${index}`}
                 src={`https://i.pravatar.cc/150?img=${index + 1}`}
                 className={`w-8 h-8 rounded-full border-2 border-white ${
                   index !== 0 ? "-ml-2" : ""
                 }`}
-                alt={member.name}
+                alt={`Team member ${index}`}
               />
             ))}
 
@@ -244,7 +244,7 @@ const ProjectPage = () => {
         ) : activeTab === "task" ? (
           <Task projectId={projectId} taskFilter={taskFilter} />
         ) : (
-          <Nember projectId={projectId} projectParticipants={project.participants} />
+          <Nember projectId={projectId} projectParticipants={project.participantDetails} />
         )}
       </div>
 

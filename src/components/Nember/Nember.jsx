@@ -29,15 +29,20 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
         
         // First, check if participants are passed directly (already populated)
         if (projectParticipants && Array.isArray(projectParticipants) && projectParticipants.length > 0) {
+          console.log("Using projectParticipants prop:", projectParticipants);
           usersData = projectParticipants;
         } else if (projectId) {
           // Otherwise, fetch from API
+          console.log("Fetching members for projectId:", projectId);
           const response = await axios.get(`${BASE_URL}/projects/${projectId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           
-          // Map API response to get participants (which are user objects)
-          usersData = response.data.participants || [];
+          console.log("API Response:", response.data);
+          
+          // IMPORTANT: Use participantDetails (full user objects) instead of participants (IDs)
+          usersData = response.data.participantDetails || response.data.participants || [];
+          console.log("usersData after extracting from response:", usersData);
         } else {
           // Fallback: fetch all company users
           const response = await axios.get(`${BASE_URL}/company/users`, {
@@ -47,13 +52,19 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
         }
         
         if (!Array.isArray(usersData)) {
+          console.log("usersData is not an array:", usersData);
           setMembers([]);
           return;
         }
         
+        console.log("usersData before mapping:", usersData);
+        
         // Map users using dataMapper and add UI-specific properties
         const mappedUsers = usersData.map((user, idx) => {
+          console.log("Mapping user:", user);
           const mappedUser = mapUserData(user);
+          console.log("Mapped user result:", mappedUser);
+          
           return {
             ...mappedUser,
             img: (idx % 70) + 1, // Random avatar for UI
@@ -63,7 +74,9 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
           };
         });
         
+        console.log("Final mappedUsers before setState:", mappedUsers);
         setMembers(mappedUsers);
+        
       } catch (error) {
         console.error('Error fetching members:', error);
         setMembers(projectParticipants && Array.isArray(projectParticipants) ? projectParticipants : []);

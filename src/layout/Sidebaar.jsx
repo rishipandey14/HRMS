@@ -14,18 +14,19 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useRbac } from "../context/RbacContext";
 
 const menuItems = [
-  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
-  { label: "Projects", icon: FolderKanban, to: "/projects" },
+  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", permission: "dashboard.view" },
+  { label: "Projects", icon: FolderKanban, to: "/projects", permission: "project.view" },
   { label: "Calendar", icon: Calendar, to: "/calendar" },
-  { label: "Chat", icon: MessageSquare, to: "/chat" },
-  { label: "Team", icon: Users, to: "/team" },
+  { label: "Chat", icon: MessageSquare, to: "/chat", permission: "chat.view" },
+  { label: "Team", icon: Users, to: "/team", permission: "user.view" },
   { label: "Jobs", icon: Briefcase, to: "/jobs" },
 ];
 
 const generalItems = [
-  { label: "Settings", icon: Settings, to: "/settings" },
+  { label: "Settings", icon: Settings, to: "/settings", permission: "settings.view" },
   { label: "Help", icon: HelpCircle, to: "/contact" },
   
 ];
@@ -34,6 +35,17 @@ const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { loading, hasPermission } = useRbac();
+
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  const visibleGeneralItems = generalItems.filter((item) => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
 
   const handleNavigation = (to) => {
     navigate(to);
@@ -59,7 +71,7 @@ const Sidebar = () => {
 
         {/* Menu Items */}
         <nav className="space-y-2">
-          {menuItems.map(({ label, icon: Icon, to }) => (
+          {visibleMenuItems.map(({ label, icon: Icon, to }) => (
             <button
               key={label}
               onClick={() => handleNavigation(to)}
@@ -106,7 +118,7 @@ const Sidebar = () => {
           {collapsed ? "" : "General"}
         </p>
         <nav className="space-y-2">
-          {generalItems.map(({ label, icon: Icon, to }) => (
+          {visibleGeneralItems.map(({ label, icon: Icon, to }) => (
             <button
               key={label}
               onClick={() => handleNavigation(to)}
@@ -126,11 +138,16 @@ const Sidebar = () => {
           ))}
         </nav>
       </div>
+      {loading && (
+        <div className="absolute bottom-28 left-0 w-full px-4 text-xs text-center text-gray-400">
+          Loading access...
+        </div>
+      )}
       {/* Bottom Buttons */}
       <div className="absolute bottom-6 left-0 w-full flex flex-col items-center space-y-3 px-4">
         {/* Upgrade Button */}
         <button
-          onClick={() => handleNavigation('/Plan')}
+          onClick={() => handleNavigation('/plan')}
           className={`transition flex items-center justify-center font-semibold shadow-md cursor-pointer
             ${collapsed
               ? 'w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-red-500 text-white text-xl p-0'

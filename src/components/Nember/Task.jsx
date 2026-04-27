@@ -20,6 +20,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   const [popupMode, setPopupMode] = useState("Update");
   const [selectedTask, setSelectedTask] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // ⭐ PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,6 +33,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
         setCurrentUserId(payload.id || payload._id);
+        setIsAdmin(payload.role === "admin" || payload.role === "sadmin");
       } catch (err) {
         console.error("Error parsing token:", err);
       }
@@ -51,7 +53,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           return;
         }
 
-        const res = await axios.get(`${BASE_URL}/tasks/${projectId}`, {
+        const res = await axios.get(`${BASE_URL}/projects/${projectId}/tasks`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -96,8 +98,16 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           (task) =>
             task.assignedTo &&
             (Array.isArray(task.assignedTo)
-              ? task.assignedTo.some(user => (user._id || user) === userId)
-              : (task.assignedTo._id || task.assignedTo) === userId)
+              ? task.assignedTo.some(user => {
+                  // Handle both user objects and user IDs
+                  if (typeof user === 'object') {
+                    return (user.id || user._id) === userId;
+                  }
+                  return user === userId;
+                })
+              : (typeof task.assignedTo === 'object' 
+                  ? (task.assignedTo.id || task.assignedTo._id) === userId
+                  : task.assignedTo === userId))
         );
       }
     }
@@ -161,8 +171,8 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
   };
 
   const goToUpdatesPage = (task) => {
-    if (!projectId || !task?._id) return;
-    navigate(`/projects/${projectId}/tasks/${task._id}/updates`, { state: { task } });
+    if (!projectId || !task?.id) return;
+    navigate(`/projects/${projectId}/tasks/${task.id}/updates`, { state: { task } });
   };
 
   // ⭐ HANDLE TASK ACTIONS (updates vs final submit)
@@ -182,9 +192,9 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
       };
 
       if (popupMode === "Submit") {
-        // Final submission: mark task as completed
+        // Final submission: mark task as completed AND create an update entry
         const res = await axios.put(
-          `${BASE_URL}/tasks/${projectId}/${taskId}`,
+          `${BASE_URL}/projects/${projectId}/tasks/${taskId}`,
           { 
             status: "Completed",
             submissionNotes: description,
@@ -192,10 +202,21 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           commonHeaders
         );
 
+        // Also create an update entry so it appears in the updates history
+        await axios.post(
+          `${BASE_URL}/projects/${projectId}/tasks/${taskId}/updates`,
+          {
+            status: "Completed",
+            note: description,
+            date: new Date(),
+          },
+          commonHeaders
+        );
+
         // Update local task list to reflect completion
         setTasks((prevTasks) =>
           prevTasks.map((task) =>
-            task._id === taskId ? { ...task, status: "Completed" } : task
+            task.id === taskId ? { ...task, status: "Completed" } : task
           )
         );
 
@@ -204,7 +225,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
         // Regular update: add an update entry without closing the task
         const currentStatus = selectedTask?.status || "In Progress";
         await axios.post(
-          `${BASE_URL}/tasks/${projectId}/${taskId}/updates`,
+          `${BASE_URL}/projects/${projectId}/tasks/${taskId}/updates`,
           {
             status: currentStatus,
             note: description,
@@ -231,8 +252,16 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
     return (
       task.assignedTo &&
       (Array.isArray(task.assignedTo)
-        ? task.assignedTo.some(user => (user._id || user) === currentUserId)
-        : (task.assignedTo._id || task.assignedTo) === currentUserId)
+        ? task.assignedTo.some(user => {
+            // Handle both user objects and user IDs
+            if (typeof user === 'object') {
+              return (user.id || user._id) === currentUserId;
+            }
+            return user === currentUserId;
+          })
+        : (typeof task.assignedTo === 'object' 
+            ? (task.assignedTo.id || task.assignedTo._id) === currentUserId
+            : task.assignedTo === currentUserId))
     );
   };
 
@@ -281,21 +310,22 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
           <tbody>
             {paginatedTasks.map((task) => {
               const assignedToUser = isTaskAssignedToUser(task);
+              const canAccessTask = isAdmin || assignedToUser;
               return (
               <tr
-                key={task._id}
+                key={task.id}
                 className={`bg-white text-sm text-gray-800 rounded-lg shadow-sm`}
               >
                 <td className="px-4 lg:px-6 py-5 rounded-l-lg">
                   <button
                     type="button"
-                    disabled={!assignedToUser}
+                    disabled={!canAccessTask}
                     className={`text-left w-full ${
-                      assignedToUser 
+                      canAccessTask 
                         ? "hover:text-blue-600 cursor-pointer" 
                         : ""
                     }`}
-                    onClick={() => assignedToUser && goToUpdatesPage(task)}
+                    onClick={() => canAccessTask && goToUpdatesPage(task)}
                   >
                     {task.description}
                   </button>
@@ -305,16 +335,16 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                   <div className="flex items-center gap-2">
                     <img
                       src={`https://i.pravatar.cc/150?img=${Math.abs(
-                        task._id.charCodeAt(0)
+                        (task.id || "1").toString().charCodeAt(0)
                       ) % 100}`}
                       alt="Assignee"
                       className="w-8 h-8 rounded-full"
                     />
                     <span className="truncate">
                       {Array.isArray(task.assignedTo) && task.assignedTo.length > 0
-                        ? typeof task.assignedTo[0] === "string"
-                          ? task.assignedTo[0].slice(0, 15) + "..."
-                          : task.assignedTo[0]?.name || "Unassigned"
+                        ? typeof task.assignedTo[0] === "object"
+                          ? task.assignedTo[0]?.name || "Unassigned"
+                          : task.assignedTo[0]
                         : "Unassigned"}
                     </span>
                   </div>
@@ -341,10 +371,10 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 {/* UPDATE BUTTON */}
                 <td className="px-4 lg:px-6 py-5">
                   <button
-                    disabled={!assignedToUser}
-                    onClick={() => assignedToUser && openPopup(task, "Update")}
+                    disabled={!canAccessTask}
+                    onClick={() => canAccessTask && openPopup(task, "Update")}
                     className={`text-sm px-3 py-1 rounded-full transition ${
-                      assignedToUser
+                      canAccessTask
                         ? "text-blue-500 border border-blue-500 hover:bg-blue-50 cursor-pointer"
                         : ""
                     }`}
@@ -356,10 +386,10 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
                 {/* SUBMIT BUTTON */}
                 <td className="px-4 lg:px-6 py-5">
                   <button
-                    disabled={!assignedToUser}
-                    onClick={() => assignedToUser && openPopup(task, "Submit")}
+                    disabled={!canAccessTask}
+                    onClick={() => canAccessTask && openPopup(task, "Submit")}
                     className={`text-sm px-3 py-1 rounded-full transition ${
-                      assignedToUser
+                      canAccessTask
                         ? "text-blue-500 border border-blue-500 hover:bg-blue-50 cursor-pointer"
                         : ""
                     }`}
@@ -387,7 +417,7 @@ const Task = ({ projectId: propProjectId, taskFilter = "all" }) => {
         isOpen={popupOpen}
         onClose={() => setPopupOpen(false)}
         title={popupTitle}
-        taskId={selectedTask?._id}
+        taskId={selectedTask?.id}
         onSubmitTask={handleSubmitTask}
       />
     </div>

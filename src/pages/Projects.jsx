@@ -86,7 +86,7 @@ function ProjectCard({ project, onViewClick }) {
   return (
     <div
       className="mb-1 rounded-3xl border p-4 transition-all hover:-translate-y-px hover:bg-white cursor-pointer"
-      onClick={() => onViewClick(project._id)}
+      onClick={() => onViewClick(project.id)}
       style={{
         borderColor: colors.borderCard,
         backgroundColor: colors.bgCard,
@@ -196,7 +196,7 @@ function ProjectColumn({ title, count, projects, type, isAdminPanelOpen, isUserP
       </div>
       <div className="column-content flex flex-1 flex-col gap-4 overflow-y-auto pr-1">
         {projects.map((project) => (
-          <ProjectCard key={project._id || project.id} project={project} onViewClick={onProjectClick} />
+          <ProjectCard key={project.id} project={project} onViewClick={onProjectClick} />
         ))}
       </div>
     </div>
@@ -269,8 +269,7 @@ export default function ProjectsView() {
 
     projects.forEach((p) => {
       const card = {
-        _id: p._id,
-        id: p._id,
+        id: p.id,
         title: p.title,
         priority: '',
         progress: p.taskProgress || 0, // ⭐ Use progress from backend
