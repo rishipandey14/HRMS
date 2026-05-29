@@ -1,5 +1,7 @@
 import React, { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import axios from "axios"
+import { BASE_URL } from "../../utility/Config"
 import {
   ArrowLeft,
   MapPin,
@@ -18,6 +20,9 @@ const JobDetails = () => {
   const navigate = useNavigate()
   const { job } = location.state || {}
   const [activeTab, setActiveTab] = useState("description")
+  const [ranking, setRanking] = useState([])
+  const [rankingLoading, setRankingLoading] = useState(false)
+  const [rankingError, setRankingError] = useState("")
 
   // If no job data, redirect back
   if (!job) {
@@ -50,6 +55,27 @@ const JobDetails = () => {
         return "bg-red-100 text-red-800"
       default:
         return "bg-green-100 text-green-800"
+    }
+  }
+
+  const handleRankResumes = async () => {
+    try {
+      setRankingLoading(true)
+      setRankingError("")
+
+      const token = localStorage.getItem("token")
+      const response = await axios.post(
+        `${BASE_URL}/jobs/${job.id}/rank`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+
+      setRanking(Array.isArray(response.data) ? response.data : [])
+      setActiveTab("applicants")
+    } catch (error) {
+      setRankingError(error.response?.data?.error || error.response?.data?.msg || "Failed to rank resumes")
+    } finally {
+      setRankingLoading(false)
     }
   }
 
@@ -130,12 +156,22 @@ const JobDetails = () => {
             )}
           </div>
           
-          {job.status === "open" && (
-            <button className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
-              <Send size={18} />
-              Apply Now
+          <div className="flex flex-wrap gap-3 justify-end">
+            <button
+              onClick={handleRankResumes}
+              disabled={rankingLoading}
+              className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-semibold shadow-md disabled:opacity-60"
+            >
+              {rankingLoading ? "Ranking..." : "Rank Resumes"}
             </button>
-          )}
+
+            {job.status === "open" && (
+              <button className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
+                <Send size={18} />
+                Apply Now
+              </button>
+            )}
+          </div>
           
           {job.status === "closed" && (
             <div className="px-6 py-3 bg-gray-200 text-gray-600 rounded-lg font-semibold">
@@ -191,6 +227,29 @@ const JobDetails = () => {
 
       {/* Tab Content */}
       <div className="w-full bg-white p-6 rounded-b-xl shadow-sm">
+        {rankingError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {rankingError}
+          </div>
+        )}
+
+        {ranking.length > 0 && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <h3 className="mb-3 font-semibold text-blue-900">Ranked Candidates</h3>
+            <div className="space-y-2">
+              {ranking.map((candidate, index) => (
+                <div key={candidate.id} className="flex items-center justify-between rounded-md bg-white px-3 py-2 shadow-sm">
+                  <div>
+                    <div className="font-medium text-gray-800">#{index + 1} {candidate.name}</div>
+                    <div className="text-xs text-gray-500">ID: {candidate.id}</div>
+                  </div>
+                  <div className="text-sm font-semibold text-blue-700">Score: {candidate.score}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {activeTab === "description" && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-800 mb-4">About the Position</h2>

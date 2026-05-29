@@ -115,7 +115,7 @@ const Dashboard = () => {
     try {
       setLoadingUsers(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${BASE_URL}/company/users`, {
+      const response = await axios.get(`${BASE_URL}/company/users?includeAllRoles=true`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCompanyUsers(response.data.users || []);

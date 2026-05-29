@@ -45,7 +45,7 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
           console.log("usersData after extracting from response:", usersData);
         } else {
           // Fallback: fetch all company users
-          const response = await axios.get(`${BASE_URL}/company/users`, {
+          const response = await axios.get(`${BASE_URL}/company/users?includeAllRoles=true`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           usersData = response.data.users || [];

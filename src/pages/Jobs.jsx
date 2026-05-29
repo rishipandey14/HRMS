@@ -1,7 +1,9 @@
 "use client"
 
 import { Plus, MapPin, DollarSign, Clock, Briefcase } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import axios from 'axios'
+import { BASE_URL } from "../utility/Config"
 import { useNavigate } from "react-router-dom"
 
 // Define colors directly in the component file
@@ -219,216 +221,92 @@ export default function JobsView() {
   const [newJobRequirements, setNewJobRequirements] = useState('')
   const [newJobResponsibilities, setNewJobResponsibilities] = useState('')
 
-  const [openJobs, setOpenJobs] = useState([
-    {
-      id: 1,
-      title: "Senior Frontend Developer",
-      department: "Engineering",
-      type: "Full-time",
-      status: "open",
-      location: "San Francisco, CA (Remote)",
-      salary: "$120k - $160k/year",
-      postedDate: "2 days ago",
-      applicantCount: 45,
-      applicants: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      description: "We are looking for a Senior Frontend Developer to join our team...",
-      requirements: [
-        "5+ years of experience with React",
-        "Strong knowledge of TypeScript",
-        "Experience with modern CSS frameworks",
-      ],
-      responsibilities: [
-        "Build and maintain frontend applications",
-        "Collaborate with design and backend teams",
-        "Code reviews and mentoring",
-      ],
-    },
-    {
-      id: 2,
-      title: "Product Designer",
-      department: "Design",
-      type: "Full-time",
-      status: "open",
-      location: "New York, NY (Hybrid)",
-      salary: "$100k - $140k/year",
-      postedDate: "5 days ago",
-      applicantCount: 32,
-      applicants: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      description: "Join our design team to create amazing user experiences...",
-      requirements: [
-        "3+ years of product design experience",
-        "Proficiency in Figma and design systems",
-        "Strong portfolio demonstrating UX skills",
-      ],
-      responsibilities: [
-        "Design user interfaces and experiences",
-        "Conduct user research and testing",
-        "Maintain design system",
-      ],
-    },
-    {
-      id: 3,
-      title: "Marketing Intern",
-      department: "Marketing",
-      type: "Internship",
-      status: "open",
-      location: "Remote",
-      salary: "$20/hour",
-      postedDate: "1 week ago",
-      applicantCount: 78,
-      applicants: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      description: "Great opportunity for students to learn marketing...",
-      requirements: [
-        "Currently enrolled in Marketing or related field",
-        "Strong communication skills",
-        "Social media savvy",
-      ],
-      responsibilities: [
-        "Assist with social media campaigns",
-        "Content creation and scheduling",
-        "Market research",
-      ],
-    },
-  ]
-  )
+  const [openJobs, setOpenJobs] = useState([])
+  const [inReviewJobs, setInReviewJobs] = useState([])
+  const [closedJobsState, setClosedJobsState] = useState([])
 
-  const [inReviewJobs, setInReviewJobs] = useState([
-    {
-      id: 4,
-      title: "DevOps Engineer",
-      department: "Infrastructure",
-      type: "Full-time",
-      status: "in-review",
-      location: "Austin, TX (Remote)",
-      salary: "$130k - $170k/year",
-      postedDate: "3 weeks ago",
-      applicantCount: 28,
-      applicants: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      description: "Looking for an experienced DevOps engineer...",
-      requirements: [
-        "Experience with AWS/GCP/Azure",
-        "Strong knowledge of CI/CD pipelines",
-        "Terraform and Kubernetes experience",
-      ],
-      responsibilities: [
-        "Manage cloud infrastructure",
-        "Implement CI/CD pipelines",
-        "Monitor system performance",
-      ],
-    },
-    {
-      id: 5,
-      title: "Content Writer",
-      department: "Content",
-      type: "Part-time",
-      status: "in-review",
-      location: "Remote",
-      salary: "$40k - $60k/year",
-      postedDate: "2 weeks ago",
-      applicantCount: 15,
-      applicants: ["/placeholder.svg?height=24&width=24"],
-      description: "Create engaging content for our blog and social media...",
-      requirements: [
-        "2+ years of content writing experience",
-        "Excellent grammar and writing skills",
-        "SEO knowledge",
-      ],
-      responsibilities: [
-        "Write blog posts and articles",
-        "Create social media content",
-        "Collaborate with marketing team",
-      ],
-    },
-  ])
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`${BASE_URL}/jobs`, {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        });
+        const jobs = res.data || [];
 
-  const [closedJobsState, setClosedJobsState] = useState([
-    {
-      id: 6,
-      title: "Backend Developer",
-      department: "Engineering",
-      type: "Full-time",
-      status: "closed",
-      location: "Seattle, WA",
-      salary: "$110k - $150k/year",
-      postedDate: "2 months ago",
-      applicantCount: 120,
-      applicants: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      description: "Position has been filled.",
-      requirements: [],
-      responsibilities: [],
-    },
-    {
-      id: 7,
-      title: "Data Analyst",
-      department: "Analytics",
-      type: "Contract",
-      status: "closed",
-      location: "Boston, MA",
-      salary: "$80k - $100k/year",
-      postedDate: "3 months ago",
-      applicantCount: 67,
-      applicants: [
-        "/placeholder.svg?height=24&width=24",
-        "/placeholder.svg?height=24&width=24",
-      ],
-      description: "Contract position has been completed.",
-      requirements: [],
-      responsibilities: [],
-    },
-  ])
+        const normalize = (job) => {
+          const created = job.createdAt ? new Date(job.createdAt) : new Date();
+          const diffDays = Math.floor((Date.now() - created) / 86400000);
+          const postedDate = diffDays === 0 ? 'Today' : `${diffDays} days ago`;
+          const applicants = (job.candidates || []).map((c) => c.resume_url || '/placeholder.svg?height=24&width=24');
+          const applicantCount = job.applicantCount || applicants.length || 0;
+          return { ...job, postedDate, applicants, applicantCount };
+        };
+
+        const open = jobs.filter(j => j.status === 'open').map(normalize);
+        const inReview = jobs.filter(j => j.status === 'in-review').map(normalize);
+        const closed = jobs.filter(j => j.status === 'closed').map(normalize);
+
+        setOpenJobs(open);
+        setInReviewJobs(inReview);
+        setClosedJobsState(closed);
+      } catch (error) {
+        console.error('Error fetching jobs:', error);
+      }
+    };
+
+    fetchJobs();
+  }, []);
 
   // Add Job handler
-  const handleAddJob = () => {
-    const newJob = {
-      id: Date.now(),
+  const handleAddJob = async () => {
+    const payload = {
       title: newJobTitle || 'Untitled Role',
       department: newJobDepartment || 'General',
       type: newJobType,
       status: newJobStatus,
       location: newJobLocation,
       salary: newJobSalary || 'Competitive',
-      postedDate: 'Just now',
-      applicantCount: 0,
-      applicants: [],
       description: newJobDescription,
-      requirements: newJobRequirements ? newJobRequirements.split('\n').map(s => s.trim()).filter(Boolean) : [],
-      responsibilities: newJobResponsibilities ? newJobResponsibilities.split('\n').map(s => s.trim()).filter(Boolean) : [],
+      requirements: newJobRequirements ? newJobRequirements.split('\n').map((s) => s.trim()).filter(Boolean) : [],
+      responsibilities: newJobResponsibilities ? newJobResponsibilities.split('\n').map((s) => s.trim()).filter(Boolean) : [],
+      is_public: true,
     }
 
-    if (newJob.status === 'open') setOpenJobs((s) => [newJob, ...s])
-    else if (newJob.status === 'in-review') setInReviewJobs((s) => [newJob, ...s])
-    else setClosedJobsState((s) => [newJob, ...s])
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.post(`${BASE_URL}/jobs`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
+      })
+      const created = response.data
+      const normalize = {
+        ...created,
+        postedDate: 'Just now',
+        applicantCount: 0,
+        applicants: [],
+      }
 
-    // reset form
-    setNewJobTitle('')
-    setNewJobDepartment('')
-    setNewJobType('Full-time')
-    setNewJobStatus('open')
-    setNewJobLocation('Remote')
-    setNewJobSalary('')
-    setNewJobDescription('')
-    setNewJobRequirements('')
-    setNewJobResponsibilities('')
-    setShowAddModal(false)
+      if (normalize.status === 'open') setOpenJobs((s) => [normalize, ...s])
+      else if (normalize.status === 'in-review') setInReviewJobs((s) => [normalize, ...s])
+      else setClosedJobsState((s) => [normalize, ...s])
+
+      // reset form
+      setNewJobTitle('')
+      setNewJobDepartment('')
+      setNewJobType('Full-time')
+      setNewJobStatus('open')
+      setNewJobLocation('Remote')
+      setNewJobSalary('')
+      setNewJobDescription('')
+      setNewJobRequirements('')
+      setNewJobResponsibilities('')
+      setShowAddModal(false)
+    } catch (error) {
+      console.error('Error creating job:', error)
+      alert(error.response?.data?.error || 'Failed to create job')
+    }
   }
 
   return (
