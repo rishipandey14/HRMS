@@ -4,6 +4,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 import { Send, Plus, MoreVertical, CornerUpLeft, Check, CheckCheck } from "lucide-react";
 import { CHAT_BASE_URL, BASE_URL } from "../../utility/Config";
+import { formatLastSeen, getPresenceBadgeClass, getPresenceBadgeLabel, getPresenceDotClass } from "../../utility/presence";
 
 const parseToken = (token) => {
   try {
@@ -32,6 +33,7 @@ const Messege = ({ initialChatId }) => {
   const [newChatMessage, setNewChatMessage] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null);
+  const [nowTick, setNowTick] = useState(Date.now());
   
   // User cache to avoid repeated API calls - stored in state to trigger re-renders
   const [userCache, setUserCache] = useState({});
@@ -54,7 +56,14 @@ const Messege = ({ initialChatId }) => {
   const normalizeUser = (u) => {
     if (!u) return { _id: "unknown", name: "Unknown" };
     if (typeof u === "string") return { _id: u, name: u };
-    return { _id: u._id || u.id, name: u.name || u.email || "Unknown", email: u.email };
+    return {
+      _id: u._id || u.id,
+      name: u.name || u.email || "Unknown",
+      email: u.email,
+      isOnline: Boolean(u.isOnline),
+      lastSeenAt: u.lastSeenAt || null,
+      lastSeenAgo: u.lastSeenAgo || null,
+    };
   };
 
   const formatDate = (value) => {
@@ -70,6 +79,14 @@ const Messege = ({ initialChatId }) => {
     if (Number.isNaN(date.getTime())) return "";
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTick(Date.now());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const getReplyPreview = (msg) => {
     if (!msg) return "";
@@ -104,6 +121,9 @@ const Messege = ({ initialChatId }) => {
               _id: userId,
               name: user.name,
               email: user.email,
+              isOnline: Boolean(user.isOnline),
+              lastSeenAt: user.lastSeenAt || null,
+              lastSeenAgo: user.lastSeenAgo || null,
             };
           }
         });
@@ -126,17 +146,21 @@ const Messege = ({ initialChatId }) => {
         title: chat.groupName || `Group (${chat.members?.length || 0})`,
         subtitle: `${chat.members?.length || 0} members`,
         avatar: chat.groupAvatar || `https://i.pravatar.cc/150?u=${chatId || "group"}`,
+        lastSeenAt: null,
       };
     }
     
     // Direct chat - get the other person's info from cache
-    const otherMemberId = chat?.members?.find((m) => m !== currentUserId);
+    const otherMemberId = chat?.members?.find((m) => String(m) !== String(currentUserId));
     const otherUserInfo = userCache[otherMemberId] || { name: otherMemberId || "Direct chat", email: "" };
     
     return {
       title: otherUserInfo.name || otherMemberId || "Direct chat",
       subtitle: otherUserInfo.email || "Direct chat",
       avatar: `https://i.pravatar.cc/150?u=${otherMemberId || "direct"}`,
+      isOnline: Boolean(otherUserInfo.isOnline),
+      lastSeenAt: otherUserInfo.lastSeenAt || null,
+      lastSeenText: getPresenceBadgeLabel(otherUserInfo, nowTick),
     };
   };
 
@@ -157,6 +181,9 @@ const Messege = ({ initialChatId }) => {
             _id: userId,
             name: senderData.name,
             email: senderData.email,
+            isOnline: Boolean(senderData.isOnline),
+            lastSeenAt: senderData.lastSeenAt || null,
+            lastSeenAgo: senderData.lastSeenAgo || null,
           },
         }));
       }
@@ -295,6 +322,42 @@ const Messege = ({ initialChatId }) => {
 
     socket.on("error", (err) => {
       console.error("Socket error:", err);
+    });
+
+    socket.on("presence_changed", (payload) => {
+      if (!payload?.userId) return;
+      const targetUserId = String(payload.userId);
+      const nextLastSeenAgo = payload.isOnline
+        ? "Online now"
+        : formatLastSeen(payload.lastSeenAt, Date.now());
+
+      setUserCache((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (String(key) !== targetUserId) return;
+          next[key] = {
+            ...next[key],
+            isOnline: Boolean(payload.isOnline),
+            lastSeenAt: payload.lastSeenAt || next[key].lastSeenAt || null,
+            lastSeenAgo: nextLastSeenAgo,
+          };
+        });
+        return next;
+      });
+
+      setMembers((prev) =>
+        prev.map((member) => {
+          const memberId = String(member._id || member.id || member.email || "");
+          if (memberId !== targetUserId) return member;
+
+          return {
+            ...member,
+            isOnline: Boolean(payload.isOnline),
+            lastSeenAt: payload.lastSeenAt || member.lastSeenAt || null,
+            lastSeenAgo: nextLastSeenAgo,
+          };
+        })
+      );
     });
 
     socket.on("disconnect", () => {
@@ -482,19 +545,32 @@ const Messege = ({ initialChatId }) => {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <img
-                    src={contact.avatar}
-                    alt="avatar"
-                    className="w-10 h-10 rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (chat.isGroup) {
-                        navigate(`/projects/${chatIdCompare}`);
-                      } else {
-                        if (otherMemberId) navigate(`/profile/${otherMemberId}`);
-                      }
-                    }}
-                  />
+                    <div className="relative">
+                      <img
+                        src={contact.avatar}
+                        alt="avatar"
+                        className="w-10 h-10 rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (chat.isGroup) {
+                            navigate(`/projects/${chatIdCompare}`);
+                          } else {
+                            if (otherMemberId) navigate(`/profile/${otherMemberId}`);
+                          }
+                        }}
+                      />
+                      {!chat.isGroup && (
+                        contact.isOnline ? (
+                          <span className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full ${getPresenceDotClass(true)}`} />
+                        ) : (
+                          <span
+                            className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full text-[6px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
+                          >
+                            {getPresenceBadgeLabel(contact, nowTick)}
+                          </span>
+                        )
+                      )}
+                    </div>
                   <div
                     onClick={(e) => {
                       e.stopPropagation();
@@ -547,11 +623,24 @@ const Messege = ({ initialChatId }) => {
         {selectedChat ? (
           <>
             <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
-              <img
-                src={selectedContact?.avatar}
-                className="w-10 h-10 rounded-full"
-                alt={selectedContact?.title || "Chat"}
-              />
+              <div className="relative">
+                <img
+                  src={selectedContact?.avatar}
+                  className="w-10 h-10 rounded-full"
+                  alt={selectedContact?.title || "Chat"}
+                />
+                {selectedChat && !selectedChat.isGroup && (
+                  selectedContact?.isOnline ? (
+                    <span className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full ${getPresenceDotClass(true)}`} />
+                  ) : (
+                    <span
+                      className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full text-[6px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
+                    >
+                      {getPresenceBadgeLabel(selectedContact, nowTick)}
+                    </span>
+                  )
+                )}
+              </div>
               <div>
                 <h2 className="font-medium">{selectedContact?.title}</h2>
                 <p className="text-xs text-gray-500">{selectedContact?.subtitle}</p>

@@ -85,6 +85,9 @@ export const mapUserData = (apiUser) => {
     // Additional fields if available
     avatar: apiUser.avatar || null,
     department: apiUser.department || null,
+    isOnline: Boolean(apiUser.isOnline),
+    lastSeenAt: apiUser.lastSeenAt || null,
+    lastSeenAgo: apiUser.lastSeenAgo || null,
   };
 };
 
