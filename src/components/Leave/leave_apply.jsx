@@ -94,6 +94,7 @@ const LeaveManagement = () => {
       await axios.post(`${BASE_URL}/notifications/requests`, {
         requestType: 'leave_request',
         title: leaveType || 'Leave Request',
+        leaveType,
         fromDate: dateRange.from,
         toDate: dateRange.to,
         description,

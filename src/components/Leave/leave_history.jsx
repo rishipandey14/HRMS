@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { BASE_URL } from '../../utility/Config';
 import useNotificationStream from '../../utility/useNotificationStream';
+import LeaveRequestDetailModal from './LeaveRequestDetailModal';
 
 const buildAuthHeader = () => {
   const token = localStorage.getItem('token');
@@ -16,6 +17,7 @@ const toAvatar = (notification) => {
 function HistoryList() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -47,6 +49,8 @@ function HistoryList() {
     const normalized = String(status || '').toLowerCase();
     if (normalized === 'approved') return 'bg-emerald-100 text-emerald-800';
     if (normalized === 'rejected') return 'bg-rose-100 text-rose-800';
+    if (normalized === 'pending_hr') return 'bg-blue-100 text-blue-800';
+    if (normalized === 'pending_manager') return 'bg-amber-100 text-amber-800';
     if (normalized === 'pending') return 'bg-amber-100 text-amber-800';
     return 'bg-gray-100 text-gray-700';
   };
@@ -72,7 +76,7 @@ function HistoryList() {
                   <tr><td className="px-5 py-6 text-sm text-gray-500" colSpan={5}>Loading...</td></tr>
                 ) : requests.length ? (
                   requests.map((r) => (
-                    <tr key={r.id} className="bg-white">
+                    <tr key={r.id} className="bg-white cursor-pointer hover:bg-slate-50" onClick={() => setSelectedRequest(r)}>
                       <td className="px-5 py-4">
                         <div className="max-w-[320px] truncate text-sm text-gray-800">{r.message}</div>
                       </td>
@@ -104,7 +108,7 @@ function HistoryList() {
             <div className="p-4 text-sm text-gray-500">Loading...</div>
           ) : requests.length ? (
             requests.map((r) => (
-              <div key={r.id} className="p-4">
+              <div key={r.id} className="p-4 cursor-pointer" onClick={() => setSelectedRequest(r)}>
                 <div className="text-sm font-medium text-gray-900 truncate">{r.message}</div>
                 <div className="mt-3 flex items-center gap-3">
                   <img src={toAvatar(r)} alt="" className="w-8 h-8 rounded-full object-cover" />
@@ -130,6 +134,17 @@ function HistoryList() {
         </div>
 
       </div>
+
+      <LeaveRequestDetailModal
+        isOpen={Boolean(selectedRequest)}
+        request={selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        canDecide={false}
+        actionLoading={false}
+        onApprove={() => {}}
+        onReject={() => {}}
+        title="Leave request details"
+      />
     </div>
   );
 }
