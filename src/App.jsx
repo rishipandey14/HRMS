@@ -14,12 +14,14 @@ import Login from "./pages/Login";
 import OrgSetup from "./components/Company/orgsetup";
 import ViewProfile from "./components/Basic/viewprofile";
 import OW_Dashboard from "./pages/ow_dashboard";
-
-
+import DashboardRedirect from "./router/DashboardRedirect";
+import DashboardRoute, { OwnerDashboardRoute } from "./router/DashboardRoute";
+import JobDetailsNew from "./components/Job/JobDetailsNew";
 import ContactPage from "./pages/ContactPage";
 
 import ProjectPage from "./components/Project/ProjectPage";
 import JobDetails from "./components/Job/JobDetails";
+import OrgRolesDivision from "./pages/org_roles_division";
 import Setting from "./pages/Settings";
  
 import Plan from "./pages/Plan";
@@ -34,6 +36,9 @@ function App() {
       {/* <Route path="/login" element={<Login />} /> */}
       <Route index element={<Login />} />
       <Route path="/orgsetup" element={<OrgSetup />} />
+      <Route path="/org-roles" element={<OrgRolesDivision />} />
+      <Route path="/jobs/share/:jobId" element={<JobDetailsNew isPublic={true} />} />
+      <Route path="/jobs/share/:jobId" element={<JobDetails isPublic={true} />} />
       <Route
         path="/"
         element={
@@ -42,8 +47,9 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="/wdashboard" element={<OW_Dashboard />} />
+        <Route path="dashboard" element={<DashboardRoute />} />
+        <Route index element={<DashboardRedirect />} />
+        <Route path="wdashboard" element={<OwnerDashboardRoute />} />
         <Route path="projects" element={<Projects />} />
         <Route path="projects/:projectId" element={<ProjectPage />} />
         <Route path="projects/:projectId/tasks/:taskId/updates" element={<TaskUpdates />} />
@@ -52,7 +58,7 @@ function App() {
         <Route path="chat/:chatId" element={<PermissionRoute requiredPermission="chat.view"><Chat /></PermissionRoute>} />
         <Route path="team" element={<PermissionRoute requiredPermission="user.view"><Team /></PermissionRoute>} />
         <Route path="jobs" element={<Jobs />} />
-        <Route path="jobs/view" element={<JobDetails />} />
+        <Route path="jobs/view" element={<JobDetailsNew />} />
         <Route path="create-project" element={<CreateProject />} />
         <Route path="leaveApply" element={<LeaveManagement />} />
         <Route path="RegularizationApply" element={<RegularizationWindow/>} />

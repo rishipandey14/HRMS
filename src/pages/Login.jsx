@@ -42,10 +42,8 @@ const Login = () => {
       if (res.data.token) {
         localStorage.setItem('token', res.data.token);
       }
-      // Redirect to dashboard
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 100);
+      // Redirect to dashboard; dashboard route will resolve the right view for directors
+      navigate("/dashboard");
     } catch (err) {
       // Check if user is awaiting approval
       if (err?.response?.status === 403 && err?.response?.data?.msg === 'Awaiting admin approval') {
@@ -124,7 +122,10 @@ const Login = () => {
       {/* Left Side - Image */}
 
       <div className="hidden md:flex h-screen w-[50%] items-center justify-center py-4 ">
-        <div className="bg-[url(./imagelogo.jpg)] bg-cover bg-center w-[80%] h-full rounded-4xl flex flex-col justify-between p-4 mr-16">
+        <div
+          className="bg-cover bg-center w-[80%] h-full rounded-4xl flex flex-col justify-between p-4 mr-16"
+          style={{ backgroundImage: "url('/imagelogo.jpg')" }}
+        >
           {/* Top Content */}
           <div className="flex flex-col items-center justify-center pt-6 text-center">
             <div className="text-white text-5xl md:text-5xl font-bold leading-tight">

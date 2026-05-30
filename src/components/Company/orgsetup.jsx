@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { BASE_URL } from "../../utility/Config";
 import { validateCompanySignup } from "../../utility/validation";
+import OrgRolesDivision from "../../pages/org_roles_division";
 
 
 export default function OnboardingFlow() {
@@ -30,6 +31,7 @@ export default function OnboardingFlow() {
   const fileInputRef = useRef(null);
   const [logoFile, setLogoFile] = useState(null);
   const [companyId, setCompanyId] = useState(null);
+  const [selectedPackage, setSelectedPackage] = useState(null);
 
   const next = () => {
     setError(null);
@@ -40,6 +42,11 @@ export default function OnboardingFlow() {
   const prev = () => setStep((s) => Math.max(1, s - 1));
 
   const openUpload = () => fileInputRef.current.click();
+
+  const handlePackageSelect = (packageData) => {
+    setSelectedPackage(packageData);
+    next();
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -161,6 +168,7 @@ export default function OnboardingFlow() {
               <img src="/logo.svg" alt="TASK FLLET" className="h-10 mb-3" />
 
               <p className="text-sm text-gray-500 mb-1">1 / 2</p>
+              <p className="text-sm text-gray-500 mb-1">1 / 3</p>
 
               <h1 className="text-3xl font-bold text-gray-800 mb-2">
                 Customize your Organization
@@ -346,7 +354,15 @@ export default function OnboardingFlow() {
         {/* =====================================================
                      STEP 2 → LOGO UPLOAD
         ======================================================*/}
-        {step === 2 && (
+        {/* =====================================================
+                     STEP 2 → PACKAGE SELECTION
+         ======================================================*/}
+        {step === 2 && <OrgRolesDivision onPackageSelect={handlePackageSelect} />}
+
+        {/* =====================================================
+                     STEP 3 → LOGO UPLOAD
+         ======================================================*/}
+        {step === 3 && (
           <div className="w-[95vw] bg-white shadow-xl rounded-[30px] p-12">
 
             <button onClick={prev} className="text-[#20A4F3] text-sm mb-4">
@@ -357,6 +373,7 @@ export default function OnboardingFlow() {
               <img src="/logo.svg" className="h-10 mb-3" />
 
               <p className="text-sm text-gray-500 mb-1">2 / 2</p>
+              <p className="text-sm text-gray-500 mb-1">3 / 3</p>
 
               <h1 className="text-3xl font-bold text-gray-800 mb-1">
                 Customize your Organization
@@ -404,9 +421,9 @@ export default function OnboardingFlow() {
         )}
 
         {/* =====================================================
-                     STEP 3 → SUCCESS SCREEN
+                     STEP 4 → SUCCESS SCREEN
         ======================================================*/}
-        {step === 3 && (
+        {step === 4 && (
           <div className="w-[95vw] bg-white rounded-[30px] p-12 flex flex-col items-center shadow-xl">
 
             <img src="/logo.svg" className="h-10 mb-6" />

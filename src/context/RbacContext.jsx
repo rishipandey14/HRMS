@@ -89,7 +89,7 @@ export const RbacProvider = ({ children }) => {
 
       setRbac({
         loading: false,
-        role: fallbackRole ? { name: fallbackRole } : null,
+        role: fallbackRole || null,
         permissions: [],
         permissionSet: new Set(),
         isAllAccess: false,

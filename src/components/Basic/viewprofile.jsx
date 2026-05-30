@@ -1,11 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import Pagination from "../Basic/pagination";   // ⭐ Your required import
-import { BASE_URL } from "../../utility/Config";
-
-
-import { CHAT_BASE_URL } from "../../utility/Config";
+import Pagination from "../Basic/pagination";
+import { BASE_URL, CHAT_BASE_URL } from "../../utility/Config";
 
 
 // Find or create a direct chat, but do not send a message
@@ -70,7 +67,12 @@ export default function ProfilePage() {
   const itemsPerPage = 5;
 
   const [user, setUser] = useState(location.state?.user || null);
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(!user);
+  const [error, setError] = useState(null);
+  
   const token = useMemo(() => (typeof window !== "undefined" ? localStorage.getItem("token") : ""), []);
+  
   // Get logged in user id from token
   const loggedInUserId = useMemo(() => {
     if (!token) return null;
@@ -82,23 +84,46 @@ export default function ProfilePage() {
     }
   }, [token]);
 
+  // Fetch user data and role info
   useEffect(() => {
-    const fetchUser = async () => {
-      if (user || !userIdParam || !token) return;
+    const fetchUserData = async () => {
+      if (user && userRole) return; // Already loaded
+      if (!userIdParam || !token) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Fetch company users and pick the matching id
-        const res = await axios.get(`${BASE_URL}/company/users`, {
+        setLoading(true);
+        setError(null);
+
+        // Fetch all company users to find the specific user
+        const usersRes = await axios.get(`${BASE_URL}/company/users`, {
           headers: { Authorization: `Bearer ${token}` },
+          params: { limit: 100, page: 1, includeAllRoles: 'true' }
         });
-        const list = Array.isArray(res.data?.users) ? res.data.users : [];
-        const found = list.find((u) => (u._id || u.id) === userIdParam);
-        if (found) setUser(found);
+
+        const usersList = Array.isArray(usersRes.data?.users) ? usersRes.data.users : [];
+        const foundUser = usersList.find((u) => String(u.id || u._id) === String(userIdParam));
+
+        if (foundUser) {
+          setUser(foundUser);
+          // Set role from user data
+          setUserRole(foundUser.role || foundUser.primaryRole || foundUser.rbacRoles?.[0]?.name || "Employee");
+        } else {
+          setError("User not found");
+        }
       } catch (err) {
-        console.error("Failed to load user profile", err);
+        console.error("Failed to load user profile:", err);
+        setError(err?.response?.data?.msg || "Failed to load user profile");
+      } finally {
+        setLoading(false);
       }
     };
-    fetchUser();
-  }, [userIdParam, token]);
+
+    fetchUserData();
+  }, [userIdParam, token, user, userRole]);
+
 
   const filteredProjects = mockProjects.filter((p) =>
     p.description.toLowerCase().includes(search.toLowerCase())
@@ -115,125 +140,174 @@ export default function ProfilePage() {
     <div className="w-full min-h-screen bg-[#f4f4f4] flex justify-center px-4 py-6">
       <div className="bg-white w-full max-w-5xl rounded-2xl shadow-sw p-6">
 
-        {/* ----- Profile Header ----- */}
-        <div className="flex flex-col md:flex-row md:items-center gap-6 bg-sky-95 p-4 rounded-xl shadow-sm ">
-          <img
-            src={`https://i.pravatar.cc/150?u=${user?._id || user?.id || "avatar"}`}
-            className="w-20 h-20 rounded-full"
-            alt="avatar"
-          />
-
-          <div className="flex-grow">
-            <h2 className="text-2xl font-semibold">{user?.name || user?.email || "User"}</h2>
-            <p className="text-gray-500">{"Member"}</p>
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-gray-500">Loading user profile...</div>
           </div>
+        )}
 
-          <div className="flex gap-3">
-            <button
-              className="w-full mt-2 text-sm bg-sky-500 text-white border px-3 py-1 rounded-full"
-              onClick={async () => {
-                if (!loggedInUserId || !userIdParam || !token) return;
-                const chatId = await findOrCreateDirectChat(loggedInUserId, userIdParam, token);
-                if (chatId) {
-                  navigate(`/chat`, {
-                    state: { chatId, user },
-                  });
-                } else {
-                  alert("Could not start chat.");
-                }
-              }}
-            >
-              Chat
-            </button>
-            <button className="w-full mt-2 text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition">
-              Email
-            </button>
+        {/* Error State */}
+        {error && !loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-red-500">{error}</div>
           </div>
-        </div>
+        )}
 
-        {/* Joined Date */}
-        <div className="text-right text-gray-500 text-sm mt-2 mb-8">
-          Date Joined: <span className="font-semibold">{new Date().toLocaleDateString()}</span>
-        </div>
+        {/* Profile Content */}
+        {!loading && user && (
+          <>
+            {/* ----- Profile Header ----- */}
+            <div className="flex flex-col md:flex-row md:items-center gap-6 bg-sky-95 p-4 rounded-xl shadow-sm">
+              <img
+                src={`https://i.pravatar.cc/150?u=${user?.id || user?._id || "avatar"}`}
+                className="w-20 h-20 rounded-full"
+                alt={user?.name || "User"}
+              />
 
-        {/* Details */}
-        <div className="flex grid md:grid-cols-2 gap-6 bg-sky-99 p-6 rounded-xl shadow-sm">
-          <div>
-            <p className="text-gray-500 text-sm">Full Name</p>
-            <p className="font-semibold">{user?.name || "-"}</p>
-          </div>
+              <div className="flex-grow">
+                <h2 className="text-2xl font-semibold">{user?.name || user?.email || "User"}</h2>
+                <p className="text-gray-500 font-medium">
+                  {userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "Employee"}
+                </p>
+              </div>
 
-          <div>
-            <p className="text-gray-500 text-sm">Email Address</p>
-            <p className="font-semibold">{user?.email || "-"}</p>
-          </div>
+              <div className="flex gap-3">
+                <button
+                  className="w-full mt-2 text-sm bg-sky-500 text-white border px-3 py-1 rounded-full hover:bg-sky-600 transition"
+                  onClick={async () => {
+                    if (!loggedInUserId || !userIdParam || !token) return;
+                    const chatId = await findOrCreateDirectChat(loggedInUserId, userIdParam, token);
+                    if (chatId) {
+                      navigate(`/chat`, {
+                        state: { chatId, user },
+                      });
+                    } else {
+                      alert("Could not start chat.");
+                    }
+                  }}
+                >
+                  Chat
+                </button>
+                <button className="w-full mt-2 text-sm text-blue-500 border border-blue-500 px-3 py-1 rounded-full hover:bg-blue-50 transition">
+                  Email
+                </button>
+              </div>
+            </div>
 
-          <div>
-            <p className="text-gray-500 text-sm">Phone Number</p>
-            <p className="font-semibold">+91 62661 65883</p>
-          </div>
+            {/* Joined Date */}
+            <div className="text-right text-gray-500 text-sm mt-2 mb-8">
+              Date Joined: <span className="font-semibold">
+                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}
+              </span>
+            </div>
 
-          <div>
-            <p className="text-gray-500 text-sm">Job Title</p>
-            <p className="font-semibold">Product Manager</p>
-          </div>
-        </div>
+            {/* Details Grid */}
+            <div className="grid md:grid-cols-2 gap-6 bg-sky-99 p-6 rounded-xl shadow-sm">
+              <div>
+                <p className="text-gray-500 text-sm">Full Name</p>
+                <p className="font-semibold">{user?.name || "-"}</p>
+              </div>
 
-        {/* Projects Header */}
-        <div className="mt-10 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Projects</h3>
+              <div>
+                <p className="text-gray-500 text-sm">Email Address</p>
+                <p className="font-semibold">{user?.email || "-"}</p>
+              </div>
 
-          <input
-            type="text"
-            placeholder="Search Projects"
-            className="border border-blue-500 text-sm text-blue-600 px-3 py-1 rounded-lg"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
+              <div>
+                <p className="text-gray-500 text-sm">Phone Number</p>
+                <p className="font-semibold">{user?.mobile || "Not provided"}</p>
+              </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto mt-4">
-          <table className="w-full border rounded-xl overflow-hidden">
-            <thead className="bg-gray-100 text-blue-400">
-              <tr>
-                <th className="p-3 text-left">Description</th>
-                <th className="p-3 text-left">Start Date</th>
-                <th className="p-3 text-left">Due Date</th>
-                <th className="p-3 text-left">Status</th>
-              </tr>
-            </thead>
+              <div>
+                <p className="text-gray-500 text-sm">Role</p>
+                <p className="font-semibold capitalize">
+                  {userRole ? userRole.replace(/_/g, " ") : "Employee"}
+                </p>
+              </div>
 
-            <tbody>
-              {paginated.map((row) => (
-                <tr key={row.id} className="border-b border-blue-100">
-                  <td className="p-3">{row.description}</td>
-                  <td className="p-3">{row.startDate}</td>
-                  <td className="p-3">{row.dueDate}</td>
-                  <td className="p-3">
-                    <span
-                      className={`px-3 py-1 border rounded-full text-sm ${statusColors[row.status]}`}
-                    >
-                      {row.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              {user?.managerId && (
+                <div>
+                  <p className="text-gray-500 text-sm">Manager ID</p>
+                  <p className="font-semibold">{user.managerId}</p>
+                </div>
+              )}
 
-        {/* ----- Pagination Component (Imported) ----- */}
-        <div className="mt-6 flex justify-center">
-          <Pagination
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={(newPage) => setPage(newPage)}
-          />
-        </div>
+              {user?.companyCode && (
+                <div>
+                  <p className="text-gray-500 text-sm">Company Code</p>
+                  <p className="font-semibold">{user.companyCode}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Projects Header */}
+            <div className="mt-10 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Assigned Projects</h3>
+
+              <input
+                type="text"
+                placeholder="Search Projects"
+                className="border border-blue-500 text-sm text-blue-600 px-3 py-1 rounded-lg"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto mt-4">
+              <table className="w-full border rounded-xl overflow-hidden">
+                <thead className="bg-gray-100 text-blue-400">
+                  <tr>
+                    <th className="p-3 text-left">Description</th>
+                    <th className="p-3 text-left">Start Date</th>
+                    <th className="p-3 text-left">Due Date</th>
+                    <th className="p-3 text-left">Status</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {paginated.length > 0 ? (
+                    paginated.map((row) => (
+                      <tr key={row.id} className="border-b border-blue-100">
+                        <td className="p-3">{row.description}</td>
+                        <td className="p-3">{row.startDate}</td>
+                        <td className="p-3">{row.dueDate}</td>
+                        <td className="p-3">
+                          <span
+                            className={`px-3 py-1 border rounded-full text-sm ${statusColors[row.status]}`}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="p-3 text-center text-gray-500">
+                        No projects found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ----- Pagination Component (Imported) ----- */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex justify-center">
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPageChange={(newPage) => setPage(newPage)}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

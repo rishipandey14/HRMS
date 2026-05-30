@@ -24,7 +24,7 @@ const Navbar = () => {
           
           setUserData({
             name: payload.email?.split('@')[0] || "User",
-            role: role?.name || (payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User'),
+            role: role || (payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User'),
             email: payload.email || ""
           });
         }

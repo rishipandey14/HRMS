@@ -6,10 +6,12 @@ import { io } from "socket.io-client";
 import { BASE_URL, CHAT_BASE_URL } from "../../utility/Config";
 import { mapUserData } from "../../utility/dataMapper";
 import { formatLastSeen, getPresenceBadgeClass, getPresenceBadgeLabel, getPresenceDotClass } from "../../utility/presence";
+import { useRbac } from "../../context/RbacContext";
 import ViewProfile from "../Basic/viewprofile"; // ✅ IMPORT VIEW PROFILE POPUP
 
 export default function Nember({ projectId: propProjectId, projectParticipants = [] }) {
   const navigate = useNavigate();
+  const { role, isAllAccess, hasPermission } = useRbac();
   const { projectId: paramProjectId } = useParams();
   const projectId = propProjectId || paramProjectId; // Use prop if available, else from URL params
   
@@ -67,6 +69,19 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
       socket.emit("connect_user");
     });
 
+    // Heartbeat: send presence_ping every 60 seconds while connected
+    let heartbeatTimer = null;
+    socket.on('connect', () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        try {
+          if (socket && socket.connected) socket.emit('presence_ping', { ts: Date.now() });
+        } catch (e) {
+          // ignore
+        }
+      }, 60000);
+    });
+
     socket.on("presence_changed", updatePresence);
     socket.connect();
 
@@ -74,6 +89,7 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
       if (socketRef.current === socket) {
         socket.disconnect();
         socketRef.current = null;
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
       }
     };
   }, []);
@@ -130,7 +146,7 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
             img: (idx % 70) + 1, // Random avatar for UI
             phone: user.mobile || user.phone || 'N/A',
             joined: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-GB') : 'N/A',
-            displayRole: user.role === 'user' ? 'Employee' : (user.role || 'N/A'),
+            displayRole: mappedUser?.role ? mappedUser.role.replace(/_/g, ' ') : 'N/A',
             lastSeenAgo: mappedUser?.lastSeenAgo || user.lastSeenAgo || null,
           };
         });
@@ -182,7 +198,8 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
     }
   };
 
-  const isAdmin = true; // Set based on user role from token/context
+  const currentRoleName = typeof role === "string" ? role : role?.name;
+  const isAdmin = Boolean(isAllAccess || currentRoleName === "admin" || hasPermission("role.update"));
 
   if (loading) {
     return (
@@ -212,10 +229,10 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
                   className="w-20 h-20 rounded-full"
                 />
                 {member.isOnline ? (
-                  <span className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full ${getPresenceDotClass(true)}`} />
+                  <span className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white ${getPresenceDotClass(true)}`} />
                 ) : (
                   <span
-                    className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full text-[6px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
+                    className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white text-[10px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
                   >
                     {getPresenceBadgeLabel(member, nowTick)}
                   </span>
@@ -304,10 +321,10 @@ export default function Nember({ projectId: propProjectId, projectParticipants =
                   alt="profile"
                 />
                 {selectedMember.isOnline ? (
-                  <span className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full ${getPresenceDotClass(true)}`} />
+                  <span className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white ${getPresenceDotClass(true)}`} />
                 ) : (
                   <span
-                    className={`absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full text-[6px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
+                    className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white text-[7px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
                   >
                     {getPresenceBadgeLabel(selectedMember, nowTick)}
                   </span>
