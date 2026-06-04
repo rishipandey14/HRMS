@@ -74,17 +74,29 @@ export const mapTaskData = (apiTask) => {
 export const mapUserData = (apiUser) => {
   if (!apiUser) return null;
 
+  const primaryRole =
+    apiUser.primaryRole ||
+    apiUser.userRole ||
+    apiUser.role ||
+    apiUser.rbacRoles?.[0]?.name ||
+    null;
+
   return {
     // API field names (Sequelize uses 'id', MongoDB uses '_id')
     id: apiUser.id || apiUser._id,
     _id: apiUser._id || apiUser.id,
     name: apiUser.name,
     email: apiUser.email,
-    role: apiUser.role,
+    role: primaryRole,
+    primaryRole,
+    rbacRoles: Array.isArray(apiUser.rbacRoles) ? apiUser.rbacRoles : [],
     
     // Additional fields if available
     avatar: apiUser.avatar || null,
     department: apiUser.department || null,
+    isOnline: Boolean(apiUser.isOnline),
+    lastSeenAt: apiUser.lastSeenAt || null,
+    lastSeenAgo: apiUser.lastSeenAgo || null,
   };
 };
 

@@ -2,12 +2,14 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { BASE_URL } from "../utility/Config";
+import LeaveRequestDetailModal from "../components/Leave/LeaveRequestDetailModal";
 
 export default function NotificationDropdown({ isOpen, onClose }) {
   const dropdownRef = useRef(null);
   const [tab, setTab] = useState("all");
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedLeaveRequest, setSelectedLeaveRequest] = useState(null);
 
   const upsertNotification = (incoming) => {
     setNotifications((prev) => {
@@ -113,6 +115,28 @@ export default function NotificationDropdown({ isOpen, onClose }) {
     }
   };
 
+  const handleLeaveDecision = async (notification, action, reason) => {
+    try {
+      const token = localStorage.getItem('token');
+      const payload = action === 'reject' ? { action, reason } : { action };
+
+      await axios.patch(
+        `${BASE_URL}/notifications/${notification.id}/decision`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        }
+      );
+
+      setSelectedLeaveRequest(null);
+      fetchNotifications();
+    } catch (error) {
+      console.error('Error handling leave decision:', error);
+      alert(error.response?.data?.msg || 'Failed to update leave request');
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -163,6 +187,33 @@ export default function NotificationDropdown({ isOpen, onClose }) {
 
   const notificationsRequests = notifications.filter((n) => n.type === "user_approval" && n.status === "pending");
   const listToShow = tab === "all" ? notifications : notificationsRequests;
+
+  const normalizeRole = (role) => String(role || '').toLowerCase();
+  const currentToken = localStorage.getItem('token');
+  const currentUser = (() => {
+    try {
+      if (!currentToken) return { id: null, role: '' };
+      return JSON.parse(atob(currentToken.split('.')[1]));
+    } catch {
+      return { id: null, role: '' };
+    }
+  })();
+
+  const canDecideLeave = (notification) => {
+    const status = String(notification?.status || '').toLowerCase();
+    if (!['pending_manager', 'pending_hr'].includes(status)) return false;
+    if (String(notification?.userId) === String(currentUser.id)) return false;
+
+    const targetUserId = notification?.targetUserId ? String(notification.targetUserId) : null;
+    const targetRole = normalizeRole(notification?.targetRole);
+    const currentRole = normalizeRole(currentUser.role);
+
+    return Boolean(
+      targetUserId === String(currentUser.id) ||
+      (targetRole && targetRole === currentRole) ||
+      ['admin', 'sadmin'].includes(currentRole)
+    );
+  };
 
   return (
     <>
@@ -241,7 +292,18 @@ export default function NotificationDropdown({ isOpen, onClose }) {
                           {!n.isRead && <div className="h-2 w-2 bg-red-500 rounded-full" />}
                         </div>
 
-                        <p className="text-sm text-gray-600 mt-2">{n.message}</p>
+                        <button
+                          type="button"
+                          onClick={() => n.type === 'leave_request' && setSelectedLeaveRequest(n)}
+                          className="mt-2 w-full text-left"
+                        >
+                          <p className="text-sm text-gray-600">{n.message}</p>
+                          {n.type === 'leave_request' && (
+                            <span className="mt-2 inline-flex rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700">
+                              Open leave card
+                            </span>
+                          )}
+                        </button>
                         {n.userEmail && <p className="text-xs text-gray-400 mt-1">{n.userEmail}</p>}
 
                         {n.type === "user_approval" && n.status === "pending" && (
@@ -292,6 +354,17 @@ export default function NotificationDropdown({ isOpen, onClose }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <LeaveRequestDetailModal
+        isOpen={Boolean(selectedLeaveRequest)}
+        request={selectedLeaveRequest}
+        onClose={() => setSelectedLeaveRequest(null)}
+        canDecide={Boolean(selectedLeaveRequest && canDecideLeave(selectedLeaveRequest))}
+        actionLoading={false}
+        onApprove={() => selectedLeaveRequest && handleLeaveDecision(selectedLeaveRequest, 'approve')}
+        onReject={(reason) => selectedLeaveRequest && handleLeaveDecision(selectedLeaveRequest, 'reject', reason)}
+        title="Leave request"
+      />
     </>
   );
 }

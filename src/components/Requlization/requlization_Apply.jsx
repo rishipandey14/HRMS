@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import axios from 'axios';
+import { BASE_URL } from '../../utility/Config';
 import {
   ChevronLeft,
   ChevronRight,
@@ -20,6 +22,7 @@ const RegularizationWindow = () => {
   const [description, setDescription] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
   // Mock data for the new cards
@@ -69,6 +72,34 @@ const RegularizationWindow = () => {
   const removeAttachment = () => {
     setAttachment(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('token');
+      await axios.post(`${BASE_URL}/notifications/requests`, {
+        requestType: 'regularization_request',
+        title: 'Regularization Request',
+        fromDate: dateRange.from,
+        toDate: dateRange.to,
+        description,
+        attachmentUrl: attachment?.url || null,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setDescription('');
+      setAttachment(null);
+      setDateRange({ from: '', to: '' });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      alert('Regularization request submitted');
+    } catch (error) {
+      console.error('Regularization submit error:', error);
+      alert(error.response?.data?.msg || 'Failed to submit regularization request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -267,8 +298,12 @@ const RegularizationWindow = () => {
                 <button className="px-8 py-2.5 rounded-full border border-sky-500 text-sky-500 text-sm font-medium hover:bg-sky-50 transition">
                   Cancel
                 </button>
-                <button className="px-8 py-2.5 rounded-full bg-sky-500 text-sm font-medium text-white hover:bg-sky-600 transition shadow-lg shadow-sky-200">
-                  Apply
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="px-8 py-2.5 rounded-full bg-sky-500 text-sm font-medium text-white hover:bg-sky-600 transition shadow-lg shadow-sky-200 disabled:opacity-60"
+                >
+                  {submitting ? 'Submitting...' : 'Apply'}
                 </button>
               </div>
             </div>

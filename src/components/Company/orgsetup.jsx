@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { BASE_URL } from "../../utility/Config";
 import { validateCompanySignup } from "../../utility/validation";
+import OrgRolesDivision from "../../pages/org_roles_division";
 
 
 export default function OnboardingFlow() {
@@ -30,16 +31,22 @@ export default function OnboardingFlow() {
   const fileInputRef = useRef(null);
   const [logoFile, setLogoFile] = useState(null);
   const [companyId, setCompanyId] = useState(null);
+  const [selectedPackage, setSelectedPackage] = useState(null);
 
   const next = () => {
     setError(null);
     setSuccessMessage(null);
-    setStep((s) => Math.min(3, s + 1));
+    setStep((s) => Math.min(4, s + 1));
   };
 
   const prev = () => setStep((s) => Math.max(1, s - 1));
 
   const openUpload = () => fileInputRef.current.click();
+
+  const handlePackageSelect = (packageData) => {
+    setSelectedPackage(packageData);
+    next();
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -100,17 +107,20 @@ export default function OnboardingFlow() {
 
       if (response.status === 201 && response.data) {
         const { token, company, subscription } = response.data;
+        const companyCode = company?.id || company?._id || company?.companyCode || null;
 
         // Save token and company info to localStorage
         if (token) {
           localStorage.setItem("token", token);
-          localStorage.setItem("companyId", company._id);
+          if (companyCode) {
+            localStorage.setItem("companyId", companyCode);
+          }
           localStorage.setItem("companyName", company.companyName);
           localStorage.setItem("companyEmail", company.email);
           if (subscription) {
             localStorage.setItem("companySubscription", JSON.stringify(subscription));
           }
-          setCompanyId(company._id);
+          setCompanyId(companyCode);
         }
 
         setSuccessMessage("Company registered successfully!");
@@ -161,6 +171,7 @@ export default function OnboardingFlow() {
               <img src="/logo.svg" alt="TASK FLLET" className="h-10 mb-3" />
 
               <p className="text-sm text-gray-500 mb-1">1 / 2</p>
+              <p className="text-sm text-gray-500 mb-1">1 / 3</p>
 
               <h1 className="text-3xl font-bold text-gray-800 mb-2">
                 Customize your Organization
@@ -346,7 +357,15 @@ export default function OnboardingFlow() {
         {/* =====================================================
                      STEP 2 → LOGO UPLOAD
         ======================================================*/}
-        {step === 2 && (
+        {/* =====================================================
+                     STEP 2 → PACKAGE SELECTION
+         ======================================================*/}
+        {step === 2 && <OrgRolesDivision onPackageSelect={handlePackageSelect} />}
+
+        {/* =====================================================
+                     STEP 3 → LOGO UPLOAD
+         ======================================================*/}
+        {step === 3 && (
           <div className="w-[95vw] bg-white shadow-xl rounded-[30px] p-12">
 
             <button onClick={prev} className="text-[#20A4F3] text-sm mb-4">
@@ -357,6 +376,7 @@ export default function OnboardingFlow() {
               <img src="/logo.svg" className="h-10 mb-3" />
 
               <p className="text-sm text-gray-500 mb-1">2 / 2</p>
+              <p className="text-sm text-gray-500 mb-1">3 / 3</p>
 
               <h1 className="text-3xl font-bold text-gray-800 mb-1">
                 Customize your Organization
@@ -404,9 +424,9 @@ export default function OnboardingFlow() {
         )}
 
         {/* =====================================================
-                     STEP 3 → SUCCESS SCREEN
+                     STEP 4 → SUCCESS SCREEN
         ======================================================*/}
-        {step === 3 && (
+        {step === 4 && (
           <div className="w-[95vw] bg-white rounded-[30px] p-12 flex flex-col items-center shadow-xl">
 
             <img src="/logo.svg" className="h-10 mb-6" />
@@ -423,10 +443,10 @@ export default function OnboardingFlow() {
               Welcome aboard! Start your success journey with TaskFleet!
             </p>
 
-            {/* Company ID Display */}
+            {/* Company Code Display */}
             {companyId && (
               <div className="bg-blue-50 border-2 border-[#20A4F3] rounded-[20px] p-6 mb-8 w-full max-w-md">
-                <p className="text-sm text-gray-600 mb-2 text-center">Your Company ID</p>
+                <p className="text-sm text-gray-600 mb-2 text-center">Your Company Code</p>
                 <div className="flex items-center justify-center gap-3">
                   <p className="text-2xl font-bold text-[#20A4F3] tracking-wider">
                     {companyId}
@@ -436,13 +456,13 @@ export default function OnboardingFlow() {
                       navigator.clipboard.writeText(companyId);
                     }}
                     className="text-[#20A4F3] hover:bg-blue-100 p-2 rounded-lg transition"
-                    title="Copy Company ID"
+                    title="Copy Company Code"
                   >
                     📋
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-3 text-center">
-                  Share this ID with your employees to join your organization
+                  Share this code with your employees to join your organization
                 </p>
               </div>
             )}

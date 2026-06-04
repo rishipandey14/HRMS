@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import axios from 'axios';
+import { BASE_URL } from '../../utility/Config';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,6 +24,7 @@ const LeaveManagement = () => {
   const [description, setDescription] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
   const leaveBalances = [
@@ -82,6 +85,36 @@ const LeaveManagement = () => {
   const removeAttachment = () => {
     setAttachment(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('token');
+      await axios.post(`${BASE_URL}/notifications/requests`, {
+        requestType: 'leave_request',
+        title: leaveType || 'Leave Request',
+        leaveType,
+        fromDate: dateRange.from,
+        toDate: dateRange.to,
+        description,
+        attachmentUrl: attachment?.url || null,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setLeaveType('');
+      setDescription('');
+      setAttachment(null);
+      setDateRange({ from: '', to: '' });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      alert('Leave request submitted');
+    } catch (error) {
+      console.error('Leave submit error:', error);
+      alert(error.response?.data?.msg || 'Failed to submit leave request');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -344,8 +377,12 @@ const LeaveManagement = () => {
               <button className="px-8 py-2.5 rounded-full border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
                 Cancel
               </button>
-              <button className="px-8 py-2.5 rounded-full bg-sky-500 text-sm font-medium text-white hover:bg-sky-600 transition shadow-lg shadow-sky-200">
-                Apply
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="px-8 py-2.5 rounded-full bg-sky-500 text-sm font-medium text-white hover:bg-sky-600 transition shadow-lg shadow-sky-200 disabled:opacity-60"
+              >
+                {submitting ? 'Submitting...' : 'Apply'}
               </button>
             </div>
           </div>

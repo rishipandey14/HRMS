@@ -6,7 +6,6 @@ import { TrendingUp, Video, Pause, Square, Search, Plus, MonitorX, X } from "luc
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import axios from "axios"
 import { BASE_URL } from "../utility/Config"
-import OW_Dashboard from "./ow_dashboard"
 
 const Dashboard = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1280)
@@ -115,7 +114,7 @@ const Dashboard = () => {
     try {
       setLoadingUsers(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${BASE_URL}/company/users`, {
+      const response = await axios.get(`${BASE_URL}/company/users?includeAllRoles=true`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCompanyUsers(response.data.users || []);

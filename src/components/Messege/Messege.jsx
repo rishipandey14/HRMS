@@ -2,8 +2,40 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { io } from "socket.io-client";
-import { Send, Plus, MoreVertical, CornerUpLeft, Check, CheckCheck } from "lucide-react";
+import { Send, Plus, MoreVertical, CornerUpLeft, Check, CheckCheck, Paperclip, Download, ExternalLink, X } from "lucide-react";
 import { CHAT_BASE_URL, BASE_URL } from "../../utility/Config";
+import { formatLastSeen, getPresenceBadgeClass, getPresenceBadgeLabel, getPresenceDotClass } from "../../utility/presence";
+
+const formatFileSize = (bytes) => {
+  const size = Number(bytes);
+  if (!Number.isFinite(size) || size <= 0) return null;
+  const units = ["B", "KB", "MB", "GB"];
+  let index = 0;
+  let value = size;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
+};
+
+const getAttachmentType = (msg) => {
+  const mimeType = String(msg?.fileMimeType || "").toLowerCase();
+  const fileUrl = String(msg?.fileUrl || "").toLowerCase();
+  const content = String(msg?.content || "").toLowerCase();
+  const source = `${mimeType} ${fileUrl} ${content}`;
+
+  if (/\bimage\//.test(source) || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(fileUrl)) return "IMG";
+  if (/\bpdf\b/.test(source) || /\.pdf$/.test(fileUrl)) return "PDF";
+  if (/\bword\b|\.docx?$/.test(source)) return "DOC";
+  if (/\bexcel\b|\.xlsx?$/.test(source)) return "XLS";
+  if (/\bzip\b|\barchive\b|\.zip$|\.rar$|\.7z$/.test(source)) return "ZIP";
+  if (/\bvideo\//.test(source) || /\.(mp4|mov|webm|mkv)$/.test(fileUrl)) return "VID";
+  if (/\baudio\//.test(source) || /\.(mp3|wav|ogg|m4a)$/.test(fileUrl)) return "AUD";
+  return "FILE";
+};
+
+const isImageUrl = (fileUrl = "") => /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(String(fileUrl));
 
 const parseToken = (token) => {
   try {
@@ -32,6 +64,12 @@ const Messege = ({ initialChatId }) => {
   const [newChatMessage, setNewChatMessage] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null);
+  const fileInputRef = useRef(null);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
+  const [nowTick, setNowTick] = useState(Date.now());
   
   // User cache to avoid repeated API calls - stored in state to trigger re-renders
   const [userCache, setUserCache] = useState({});
@@ -54,7 +92,14 @@ const Messege = ({ initialChatId }) => {
   const normalizeUser = (u) => {
     if (!u) return { _id: "unknown", name: "Unknown" };
     if (typeof u === "string") return { _id: u, name: u };
-    return { _id: u._id || u.id, name: u.name || u.email || "Unknown", email: u.email };
+    return {
+      _id: u._id || u.id,
+      name: u.name || u.email || "Unknown",
+      email: u.email,
+      isOnline: Boolean(u.isOnline),
+      lastSeenAt: u.lastSeenAt || null,
+      lastSeenAgo: u.lastSeenAgo || null,
+    };
   };
 
   const formatDate = (value) => {
@@ -71,6 +116,14 @@ const Messege = ({ initialChatId }) => {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowTick(Date.now());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   const getReplyPreview = (msg) => {
     if (!msg) return "";
     if (msg.content) return msg.content;
@@ -84,6 +137,57 @@ const Messege = ({ initialChatId }) => {
       return "delivered";
     }
     return "sent";
+  };
+
+  const getAttachmentName = (msg) => {
+    if (!msg) return "Attachment";
+    if (msg.content && msg.content.trim()) return msg.content.trim();
+    if (!msg.fileUrl) return "Attachment";
+    try {
+      const parts = String(msg.fileUrl).split('/');
+      return decodeURIComponent(parts[parts.length - 1] || 'Attachment');
+    } catch {
+      return "Attachment";
+    }
+  };
+
+  const downloadAttachment = async (fileUrl, fileName = "attachment") => {
+    if (!fileUrl) return;
+    try {
+      const response = await fetch(fileUrl, { credentials: 'include' });
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Attachment download failed, falling back to open:', error);
+      window.open(fileUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const buildAttachmentMeta = (file) => ({
+    fileName: file?.name || "attachment",
+    fileSize: file?.size || null,
+    fileMimeType: file?.type || null,
+  });
+
+  const openAttachment = (msg) => {
+    if (!msg?.fileUrl) return;
+    if (isImageUrl(msg.fileUrl)) {
+      setPreviewAttachment({
+        fileUrl: msg.fileUrl,
+        fileName: getAttachmentName(msg),
+        isImage: true,
+      });
+      return;
+    }
+
+    window.open(msg.fileUrl, '_blank', 'noopener,noreferrer');
   };
 
   // Fetch ALL company users once when chats exist (for displaying names)
@@ -104,6 +208,9 @@ const Messege = ({ initialChatId }) => {
               _id: userId,
               name: user.name,
               email: user.email,
+              isOnline: Boolean(user.isOnline),
+              lastSeenAt: user.lastSeenAt || null,
+              lastSeenAgo: user.lastSeenAgo || null,
             };
           }
         });
@@ -126,17 +233,21 @@ const Messege = ({ initialChatId }) => {
         title: chat.groupName || `Group (${chat.members?.length || 0})`,
         subtitle: `${chat.members?.length || 0} members`,
         avatar: chat.groupAvatar || `https://i.pravatar.cc/150?u=${chatId || "group"}`,
+        lastSeenAt: null,
       };
     }
     
     // Direct chat - get the other person's info from cache
-    const otherMemberId = chat?.members?.find((m) => m !== currentUserId);
+    const otherMemberId = chat?.members?.find((m) => String(m) !== String(currentUserId));
     const otherUserInfo = userCache[otherMemberId] || { name: otherMemberId || "Direct chat", email: "" };
     
     return {
       title: otherUserInfo.name || otherMemberId || "Direct chat",
       subtitle: otherUserInfo.email || "Direct chat",
       avatar: `https://i.pravatar.cc/150?u=${otherMemberId || "direct"}`,
+      isOnline: Boolean(otherUserInfo.isOnline),
+      lastSeenAt: otherUserInfo.lastSeenAt || null,
+      lastSeenText: getPresenceBadgeLabel(otherUserInfo, nowTick),
     };
   };
 
@@ -157,6 +268,9 @@ const Messege = ({ initialChatId }) => {
             _id: userId,
             name: senderData.name,
             email: senderData.email,
+            isOnline: Boolean(senderData.isOnline),
+            lastSeenAt: senderData.lastSeenAt || null,
+            lastSeenAgo: senderData.lastSeenAgo || null,
           },
         }));
       }
@@ -241,6 +355,17 @@ const Messege = ({ initialChatId }) => {
       socket.emit("connect_user");
     });
 
+    // Heartbeat emit: send presence_ping every 60 seconds while connected
+    let heartbeatTimer = null;
+    socket.on('connect', () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        try {
+          if (socket && socket.connected) socket.emit('presence_ping', { ts: Date.now() });
+        } catch (e) {}
+      }, 60000);
+    });
+
     socket.on("receive_message", (msg) => {
       console.log("Received message:", msg);
       upsertMessage(msg);
@@ -297,6 +422,42 @@ const Messege = ({ initialChatId }) => {
       console.error("Socket error:", err);
     });
 
+    socket.on("presence_changed", (payload) => {
+      if (!payload?.userId) return;
+      const targetUserId = String(payload.userId);
+      const nextLastSeenAgo = payload.isOnline
+        ? "Online now"
+        : formatLastSeen(payload.lastSeenAt, Date.now());
+
+      setUserCache((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((key) => {
+          if (String(key) !== targetUserId) return;
+          next[key] = {
+            ...next[key],
+            isOnline: Boolean(payload.isOnline),
+            lastSeenAt: payload.lastSeenAt || next[key].lastSeenAt || null,
+            lastSeenAgo: nextLastSeenAgo,
+          };
+        });
+        return next;
+      });
+
+      setMembers((prev) =>
+        prev.map((member) => {
+          const memberId = String(member._id || member.id || member.email || "");
+          if (memberId !== targetUserId) return member;
+
+          return {
+            ...member,
+            isOnline: Boolean(payload.isOnline),
+            lastSeenAt: payload.lastSeenAt || member.lastSeenAt || null,
+            lastSeenAgo: nextLastSeenAgo,
+          };
+        })
+      );
+    });
+
     socket.on("disconnect", () => {
       console.log("Socket disconnected");
     });
@@ -309,6 +470,7 @@ const Messege = ({ initialChatId }) => {
       if (socketRef.current === socket) {
         socket.disconnect();
         socketRef.current = null;
+        if (heartbeatTimer) clearInterval(heartbeatTimer);
       }
     };
   }, [token, upsertMessage, selectedChat, currentUserId]);
@@ -366,6 +528,74 @@ const Messege = ({ initialChatId }) => {
       setReplyToMessage(null);
     } catch (err) {
       console.error("Send message failed", err);
+    }
+  };
+
+  const uploadFileAndSend = async (file) => {
+    if (!file) return;
+    const chatId = getId(selectedChat);
+    if (!chatId) return;
+    try {
+      setUploadProgress(0);
+      setUploadingFileName(file.name);
+      const form = new FormData();
+      form.append('file', file);
+      const res = await axios.post(`${CHAT_BASE_URL}/api/messages/upload`, form, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          if (!progressEvent.total) return;
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percent);
+        },
+        maxBodyLength: Infinity,
+      });
+      const { fileUrl, fileSize, fileMimeType } = res.data || {};
+      if (!fileUrl) throw new Error('Upload did not return fileUrl');
+
+      const payload = {
+        chatId,
+        content: file.name,
+        type: 'file',
+        fileUrl,
+        fileSize: fileSize || file.size || null,
+        fileMimeType: fileMimeType || file.type || null,
+        replyToId: replyToMessage?._id || replyToMessage?.id || null,
+      };
+      socketRef.current?.emit('send_message', payload);
+      setReplyToMessage(null);
+      setUploadProgress(0);
+      setUploadingFileName("");
+    } catch (err) {
+      console.error('File upload/send failed', err);
+      alert('Failed to upload file');
+      setUploadProgress(0);
+      setUploadingFileName("");
+    }
+  };
+
+  const handleFileSelection = (file) => {
+    if (file) uploadFileAndSend(file);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragActive(false);
+    const droppedFile = event.dataTransfer?.files?.[0];
+    if (droppedFile) {
+      uploadFileAndSend(droppedFile);
     }
   };
 
@@ -482,19 +712,32 @@ const Messege = ({ initialChatId }) => {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <img
-                    src={contact.avatar}
-                    alt="avatar"
-                    className="w-10 h-10 rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (chat.isGroup) {
-                        navigate(`/projects/${chatIdCompare}`);
-                      } else {
-                        if (otherMemberId) navigate(`/profile/${otherMemberId}`);
-                      }
-                    }}
-                  />
+                    <div className="relative">
+                      <img
+                        src={contact.avatar}
+                        alt="avatar"
+                        className="w-10 h-10 rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (chat.isGroup) {
+                            navigate(`/projects/${chatIdCompare}`);
+                          } else {
+                            if (otherMemberId) navigate(`/profile/${otherMemberId}`);
+                          }
+                        }}
+                      />
+                      {!chat.isGroup && (
+                        contact.isOnline ? (
+                          <span className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white ${getPresenceDotClass(true)}`} />
+                        ) : (
+                          <span
+                            className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white text-[10px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
+                          >
+                            {getPresenceBadgeLabel(contact, nowTick)}
+                          </span>
+                        )
+                      )}
+                    </div>
                   <div
                     onClick={(e) => {
                       e.stopPropagation();
@@ -542,16 +785,67 @@ const Messege = ({ initialChatId }) => {
         </div>
       </div>
 
+      {previewAttachment?.isImage && (
+        <div className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewAttachment(null)}>
+          <div className="relative max-w-5xl w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -top-12 right-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => downloadAttachment(previewAttachment.fileUrl, previewAttachment.fileName)}
+                className="inline-flex items-center gap-1 rounded-full bg-white/10 text-white px-3 py-2 text-sm font-semibold hover:bg-white/20"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(previewAttachment.fileUrl, '_blank', 'noopener,noreferrer')}
+                className="inline-flex items-center gap-1 rounded-full bg-white/10 text-white px-3 py-2 text-sm font-semibold hover:bg-white/20"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewAttachment(null)}
+                className="inline-flex items-center justify-center rounded-full bg-white/10 text-white w-10 h-10 hover:bg-white/20"
+                aria-label="Close preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={previewAttachment.fileUrl}
+              alt={previewAttachment.fileName}
+              className="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Right: Chat */}
       <div className="flex-1 flex rounded-3xl bg-white flex-col max-h-[calc(100vh-120px)] overflow-hidden">
         {selectedChat ? (
           <>
             <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
-              <img
-                src={selectedContact?.avatar}
-                className="w-10 h-10 rounded-full"
-                alt={selectedContact?.title || "Chat"}
-              />
+              <div className="relative">
+                <img
+                  src={selectedContact?.avatar}
+                  className="w-10 h-10 rounded-full"
+                  alt={selectedContact?.title || "Chat"}
+                />
+                {selectedChat && !selectedChat.isGroup && (
+                  selectedContact?.isOnline ? (
+                    <span className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white ${getPresenceDotClass(true)}`} />
+                  ) : (
+                    <span
+                      className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full ring-2 ring-white text-[10px] font-semibold leading-none flex items-center justify-center ${getPresenceBadgeClass(false)}`}
+                    >
+                      {getPresenceBadgeLabel(selectedContact, nowTick)}
+                    </span>
+                  )
+                )}
+              </div>
               <div>
                 <h2 className="font-medium">{selectedContact?.title}</h2>
                 <p className="text-xs text-gray-500">{selectedContact?.subtitle}</p>
@@ -617,7 +911,64 @@ const Messege = ({ initialChatId }) => {
                               <div className="truncate">{getReplyPreview(msg.replyTo)}</div>
                             </div>
                           )}
-                          <div className="whitespace-pre-wrap">{msg.content || msg.text}</div>
+                          <div className="whitespace-pre-wrap">
+                            {msg.fileUrl ? (
+                              <div className="space-y-2">
+                                <div className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${fromMe ? 'bg-white/15 text-white' : 'bg-blue-50 text-blue-700'}`}>
+                                  <span className="rounded-full bg-black/10 px-2 py-0.5 text-[9px]">{getAttachmentType(msg)}</span>
+                                  <span>{getAttachmentName(msg)}</span>
+                                  {formatFileSize(msg.fileSize) && (
+                                    <span className={fromMe ? 'text-white/80' : 'text-blue-500'}>{formatFileSize(msg.fileSize)}</span>
+                                  )}
+                                </div>
+                                {isImageUrl(msg.fileUrl) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openAttachment(msg)}
+                                    className="block text-left"
+                                    title="Open image"
+                                  >
+                                    <img
+                                      src={msg.fileUrl}
+                                      alt={msg.content || 'file'}
+                                      className="max-w-xs max-h-60 rounded-md border border-white/20 shadow-sm cursor-zoom-in"
+                                    />
+                                  </button>
+                                ) : (
+                                  <div className={`rounded-xl border p-3 min-w-[220px] ${fromMe ? 'border-white/20 bg-white/10' : 'border-gray-200 bg-white'}`}>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${fromMe ? 'bg-white/15 text-white' : 'bg-blue-50 text-blue-700'}`}>{getAttachmentType(msg)}</span>
+                                        <div className="text-xs font-semibold truncate flex-1">{getAttachmentName(msg)}</div>
+                                      </div>
+                                      <div className={`text-[11px] mt-1 ${fromMe ? 'text-blue-100' : 'text-gray-500'}`}>
+                                        File attachment{formatFileSize(msg.fileSize) ? ` • ${formatFileSize(msg.fileSize)}` : ''}
+                                      </div>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center gap-2 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => openAttachment(msg)}
+                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${fromMe ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    Open
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadAttachment(msg.fileUrl, getAttachmentName(msg))}
+                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${fromMe ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                                  >
+                                    <Download className="w-3 h-3" />
+                                    Download
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              msg.content || msg.text
+                            )}
+                          </div>
                           <div className="flex items-center gap-1 justify-end mt-1 text-[10px] text-gray-200">
                             <span className={fromMe ? "text-white/80" : "text-gray-400"}>
                               {formatTime(msg.createdAt || msg.updatedAt)}
@@ -649,7 +1000,23 @@ const Messege = ({ initialChatId }) => {
                 })}
             </div>
 
-            <div className="p-4 border-t border-gray-200">
+            <div className="p-4 border-t border-gray-200" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+              {dragActive && (
+                <div className="mb-3 rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                  Drop a file or image to attach it to this chat.
+                </div>
+              )}
+              {uploadProgress > 0 && (
+                <div className="mb-3 rounded-2xl bg-gray-100 px-4 py-3">
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
+                    <span>{uploadingFileName ? `Uploading ${uploadingFileName}` : 'Uploading file'}</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${uploadProgress}%` }} />
+                  </div>
+                </div>
+              )}
               {replyToMessage && (
                 <div className="mb-2 px-4 py-2 rounded-2xl bg-gray-100 flex items-center justify-between">
                   <div className="text-sm">
@@ -666,7 +1033,19 @@ const Messege = ({ initialChatId }) => {
                   </button>
                 </div>
               )}
-              <div className="flex bg-gray-100 rounded-full px-4 py-2">
+              <div className="flex bg-gray-100 rounded-full px-2 py-2 items-center gap-2">
+                <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => {
+                  const f = e.target.files && e.target.files[0];
+                  if (f) handleFileSelection(f);
+                  e.target.value = null;
+                }} />
+                <button
+                  className="text-gray-500 p-2 hover:bg-gray-200 rounded-full"
+                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  title="Attach a file"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
                 <input
                   type="text"
                   value={input}
@@ -680,7 +1059,7 @@ const Messege = ({ initialChatId }) => {
                     }
                   }}
                 />
-                <button className="text-blue-500" onClick={sendMessage}>
+                <button className="text-blue-500 p-2 rounded-full" onClick={sendMessage}>
                   <Send className="w-5 h-5" />
                 </button>
               </div>

@@ -3,6 +3,10 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
+import { Pencil } from 'lucide-react';
+import { BASE_URL } from '../utility/Config';
+import { useRbac } from '../context/RbacContext';
 
 const LeaveCard = ({ label, total, consumed, accent }) => (
   <div className={`rounded-xl p-3 border ${accent ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-100'} flex flex-col gap-0.5`}>
@@ -83,6 +87,7 @@ const INITIAL_EVENTS = [
 
 export default function Calender() {
   const calRef = useRef();
+  const { role, isAllAccess } = useRbac();
   const [events, setEvents]         = useState(INITIAL_EVENTS);
   const [showModal, setShowModal]   = useState(false);
   const [newDate, setNewDate]       = useState('');
@@ -90,6 +95,50 @@ export default function Calender() {
   const [legendOpen, setLegendOpen] = useState(true);
   const [swipesOpen, setSwipesOpen] = useState(true);
   const [sideOpen, setSideOpen]     = useState(false); // mobile sidebar toggle
+  const [holidays, setHolidays]     = useState(HOLIDAYS);
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [holidayDraft, setHolidayDraft] = useState({ name: '', startDate: '', endDate: '', dateLabel: '' });
+  const [editingHolidayIndex, setEditingHolidayIndex] = useState(null);
+
+  const currentRoleName = typeof role === 'string' ? role : role?.name;
+  const canManageHolidays = Boolean(isAllAccess || currentRoleName === 'admin');
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+
+  const formatHolidayDisplayDate = (holiday) => {
+    if (holiday.startDate && holiday.endDate) {
+      return holiday.startDate === holiday.endDate
+        ? holiday.startDate
+        : `${holiday.startDate} to ${holiday.endDate}`;
+    }
+
+    return holiday.dateLabel || holiday.date || '';
+  };
+
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      if (!token) return;
+      try {
+        const res = await axios.get(`${BASE_URL}/holidays`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const list = Array.isArray(res.data?.holidays) ? res.data.holidays : [];
+        if (list.length) {
+          setHolidays(list.map((holiday) => ({
+            id: holiday.id,
+            name: holiday.name,
+            date: formatHolidayDisplayDate(holiday),
+            dateLabel: holiday.dateLabel,
+            startDate: holiday.startDate || '',
+            endDate: holiday.endDate || '',
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to load holidays:', error);
+      }
+    };
+
+    fetchHolidays();
+  }, [token]);
 
   useEffect(() => {
     const t = setTimeout(() => calRef.current?.getApi().updateSize(), 250);
@@ -104,6 +153,78 @@ export default function Calender() {
     const c = PALETTE[Math.floor(Math.random() * PALETTE.length)];
     setEvents(prev => [...prev, { id: String(Date.now()), title: newTitle, date: newDate, ...c }]);
     setShowModal(false);
+  };
+
+  const openHolidayEditor = (holiday = null, index = null) => {
+    setEditingHolidayIndex(index);
+    setHolidayDraft(holiday ? {
+      name: holiday.name || '',
+      startDate: holiday.startDate || '',
+      endDate: holiday.endDate || '',
+      dateLabel: holiday.dateLabel || holiday.date || '',
+    } : { name: '', startDate: '', endDate: '', dateLabel: '' });
+    setHolidayModalOpen(true);
+  };
+
+  const saveHoliday = () => {
+    if (!holidayDraft.name.trim()) return;
+
+    const hasRange = Boolean(holidayDraft.startDate.trim() || holidayDraft.endDate.trim());
+    if (hasRange && (!holidayDraft.startDate.trim() || !holidayDraft.endDate.trim())) return;
+
+    const payload = {
+      name: holidayDraft.name.trim(),
+      dateLabel: holidayDraft.dateLabel.trim() || (hasRange
+        ? `${holidayDraft.startDate.trim()} to ${holidayDraft.endDate.trim()}`
+        : ''),
+      startDate: holidayDraft.startDate.trim() || undefined,
+      endDate: holidayDraft.endDate.trim() || undefined,
+    };
+
+    if (!payload.dateLabel) return;
+
+    const request = editingHolidayIndex === null
+      ? axios.post(`${BASE_URL}/holidays`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      : axios.patch(`${BASE_URL}/holidays/${holidays[editingHolidayIndex]?.id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+    request
+      .then((res) => {
+        const nextHoliday = res.data?.holiday;
+        if (!nextHoliday) return;
+
+        const normalizedHoliday = {
+          id: nextHoliday.id,
+          name: nextHoliday.name,
+          date: formatHolidayDisplayDate(nextHoliday),
+          dateLabel: nextHoliday.dateLabel,
+          startDate: nextHoliday.startDate || '',
+          endDate: nextHoliday.endDate || '',
+        };
+
+        setHolidays((prev) => {
+          if (editingHolidayIndex === null) {
+            return [...prev, normalizedHoliday];
+          }
+
+          return prev.map((holiday, index) => (
+            index === editingHolidayIndex
+              ? normalizedHoliday
+              : holiday
+          ));
+        });
+
+        setHolidayModalOpen(false);
+        setHolidayDraft({ name: '', date: '' });
+        setEditingHolidayIndex(null);
+      })
+      .catch((error) => {
+        console.error('Failed to save holiday:', error);
+        alert(error.response?.data?.msg || 'Failed to save holiday');
+      });
   };
 
   return (
@@ -295,20 +416,44 @@ export default function Calender() {
 
             {/* Holiday List */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-slate-800">Holiday list</span>
-                <span className="text-[10px] font-semibold bg-blue-50 text-blue-600 border border-blue-100 rounded-lg px-2 py-1">
-                  2025–26
-                </span>
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-800">Holiday list</span>
+                  <span className="text-[10px] font-semibold bg-blue-50 text-blue-600 border border-blue-100 rounded-lg px-2 py-1">
+                    2025–26
+                  </span>
+                </div>
+                {canManageHolidays && (
+                  <button
+                    type="button"
+                    onClick={() => openHolidayEditor()}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1.5 hover:bg-blue-100 transition-colors"
+                    title="Add holiday"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex flex-col gap-2.5">
-                {HOLIDAYS.map(h => (
-                  <div key={h.name} className="flex items-center justify-between">
+                {holidays.map((h, index) => (
+                  <div key={`${h.name}-${index}`} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-300 flex-shrink-0" />
                       <span className="text-[12px] text-slate-600 font-medium">{h.name}</span>
                     </div>
-                    <span className="text-[11px] text-slate-400">{h.date}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-[11px] text-slate-400">{h.date}</span>
+                      {canManageHolidays && (
+                        <button
+                          type="button"
+                          onClick={() => openHolidayEditor(h, index)}
+                          className="text-slate-400 hover:text-blue-600 transition-colors"
+                          title="Edit holiday"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -373,6 +518,71 @@ export default function Calender() {
                 className="text-[12px] font-semibold text-white bg-blue-600 rounded-xl px-4 py-2 hover:bg-blue-700 transition-colors"
               >
                 Add Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Holiday Modal ─── */}
+      {holidayModalOpen && canManageHolidays && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center z-50 p-4"
+          onClick={(e) => e.target === e.currentTarget && setHolidayModalOpen(false)}
+        >
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-100 w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between mb-1">
+              <h3 className="text-[15px] font-bold text-slate-800">
+                {editingHolidayIndex === null ? 'Add Holiday' : 'Edit Holiday'}
+              </h3>
+              <button
+                onClick={() => setHolidayModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 mb-4">Use a single date or a date range for the holiday entry.</p>
+            <div className="space-y-3">
+              <input
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all placeholder:text-slate-300"
+                placeholder="Holiday name"
+                value={holidayDraft.name}
+                onChange={(e) => setHolidayDraft((prev) => ({ ...prev, name: e.target.value }))}
+                autoFocus
+              />
+              <input
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all placeholder:text-slate-300"
+                placeholder="Start date (YYYY-MM-DD)"
+                value={holidayDraft.startDate}
+                onChange={(e) => setHolidayDraft((prev) => ({ ...prev, startDate: e.target.value }))}
+              />
+              <input
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all placeholder:text-slate-300"
+                placeholder="End date (YYYY-MM-DD, leave blank for single day)"
+                value={holidayDraft.endDate}
+                onChange={(e) => setHolidayDraft((prev) => ({ ...prev, endDate: e.target.value }))}
+              />
+              <input
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all placeholder:text-slate-300"
+                placeholder="Display label (optional)"
+                value={holidayDraft.dateLabel}
+                onChange={(e) => setHolidayDraft((prev) => ({ ...prev, dateLabel: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && saveHoliday()}
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setHolidayModalOpen(false)}
+                className="text-[12px] font-semibold text-slate-500 border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveHoliday}
+                className="text-[12px] font-semibold text-white bg-blue-600 rounded-xl px-4 py-2 hover:bg-blue-700 transition-colors"
+              >
+                Save Holiday
               </button>
             </div>
           </div>

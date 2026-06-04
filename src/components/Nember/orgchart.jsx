@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import axios from "axios";
+import { BASE_URL } from "../../utility/Config";
 
 const COLORS = [
   "#2196F3","#4CAF50","#FF9800","#9C27B0","#E91E63",
@@ -16,6 +18,37 @@ const CARD_W = 220;
 const CARD_H = 80;
 const H_GAP = 80;
 const V_GAP = 20;
+
+const buildAuthHeader = () => {
+  const token = localStorage.getItem('token');
+  return { headers: { Authorization: `Bearer ${token}` } };
+};
+
+const normalizeRoleNode = (node) => ({
+  id: node.id,
+   name: node.personName || node.displayName || node.name,
+   role: node.designation || node.name,
+   empId: String(node.employeeId ?? node.membersCount ?? node.userCount ?? 0),
+  collapsed: false,
+  children: Array.isArray(node.children) ? node.children.map(normalizeRoleNode) : [],
+});
+
+const normalizeRoleTree = (nodes = []) => {
+  const roots = nodes.map(normalizeRoleNode);
+
+  if (roots.length === 1) {
+    return roots[0];
+  }
+
+  return {
+    id: "virtual-root",
+    name: "Team Hierarchy",
+    role: `${roots.length} root roles`,
+    empId: `Roles: ${roots.length}`,
+    collapsed: false,
+    children: roots,
+  };
+};
 
 function countAll(node) {
   return node.children.reduce((a, c) => a + 1 + countAll(c), 0);
@@ -76,7 +109,7 @@ function NodeTree({ node, level, onEdit, onAdd, onRemove, onToggle, rootId }) {
           <div style={{ flex: 1, overflow: "hidden" }}>
             <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{node.name}</div>
             <div style={{ fontSize: 11, color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{node.role}</div>
-            <div style={{ fontSize: 10, color: "#999" }}>ID: {node.empId}</div>
+            <div style={{ fontSize: 10, color: "#999" }}>Emp ID: {node.empId}</div>
           </div>
 
           {/* 3-dot menu */}
@@ -189,38 +222,73 @@ export default function OrgChart() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 40, y: 40 });
   const [editingNode, setEditingNode] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const containerRef = useRef(null);
-  const isPanning = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
 
-  const [tree, setTree] = useState({
-    id: 1, name: "Dianne Russell", role: "Director", empId: "001",
-    collapsed: false, children: [],
-  });
+  const [tree, setTree] = useState(null);
+  const zoomRef = useRef(1);
 
-  // Non-passive wheel listener to prevent page scroll
+  useEffect(() => {
+    let active = true;
+
+    const fetchTree = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await axios.get(`${BASE_URL}/rbac/roles/tree`, buildAuthHeader());
+        const nextTree = normalizeRoleTree(response.data?.tree || []);
+        if (active) {
+          setTree(nextTree);
+        }
+      } catch (requestError) {
+        console.error("Failed to load role hierarchy:", requestError);
+        if (active) {
+          setError(requestError.response?.data?.msg || "Failed to load role hierarchy");
+          setTree(null);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTree();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const handler = (e) => {
       e.preventDefault();
-      setZoom((z) => Math.min(Math.max(z + (e.deltaY < 0 ? 0.08 : -0.08), 0.3), 2.5));
+      const rect = el.getBoundingClientRect();
+      const pointerX = e.clientX - rect.left;
+      const pointerY = e.clientY - rect.top;
+      const currentZoom = zoomRef.current;
+      const delta = e.deltaY < 0 ? 0.08 : -0.08;
+      const nextZoom = Math.min(Math.max(currentZoom + delta, 0.3), 2.5);
+
+      const contentX = (pointerX - pan.x) / currentZoom;
+      const contentY = (pointerY - pan.y) / currentZoom;
+
+      setZoom(nextZoom);
+      setPan({
+        x: pointerX - contentX * nextZoom,
+        y: pointerY - contentY * nextZoom,
+      });
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, []);
-
-  const onMouseDown = (e) => {
-    if (e.target.closest("button")) return;
-    isPanning.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-  };
-  const onMouseMove = (e) => {
-    if (!isPanning.current) return;
-    setPan((p) => ({ x: p.x + e.clientX - lastMouse.current.x, y: p.y + e.clientY - lastMouse.current.y }));
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-  };
-  const onMouseUp = () => { isPanning.current = false; };
+  }, [pan.x, pan.y]);
 
   const updateTree = (callback) => {
     setTree((prev) => {
@@ -268,16 +336,23 @@ export default function OrgChart() {
       {/* Canvas */}
       <div
         ref={containerRef}
-        style={{ width: "100%", height: "100%", overflowY: "auto", overflowX: "hidden", cursor: "grab" }}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
+        style={{ width: "100%", height: "100%", overflowX: "auto", overflowY: "hidden", cursor: "default", WebkitOverflowScrolling: "touch" }}
       >
+        {loading ? (
+          <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: 14 }}>
+            Loading hierarchy...
+          </div>
+        ) : error ? (
+          <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "#dc2626", fontSize: 14 }}>
+            {error}
+          </div>
+        ) : !tree ? null : (
         <div style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: "0 0",
           display: "inline-block",
+          width: "max-content",
+          minWidth: "100%",
           padding: "20px",
         }}>
           <NodeTree
@@ -290,6 +365,7 @@ export default function OrgChart() {
             rootId={tree.id}
           />
         </div>
+        )}
       </div>
 
       {/* Zoom + Reset controls */}
