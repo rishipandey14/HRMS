@@ -36,7 +36,7 @@ export default function OnboardingFlow() {
   const next = () => {
     setError(null);
     setSuccessMessage(null);
-    setStep((s) => Math.min(3, s + 1));
+    setStep((s) => Math.min(4, s + 1));
   };
 
   const prev = () => setStep((s) => Math.max(1, s - 1));
@@ -107,17 +107,20 @@ export default function OnboardingFlow() {
 
       if (response.status === 201 && response.data) {
         const { token, company, subscription } = response.data;
+        const companyCode = company?.id || company?._id || company?.companyCode || null;
 
         // Save token and company info to localStorage
         if (token) {
           localStorage.setItem("token", token);
-          localStorage.setItem("companyId", company._id);
+          if (companyCode) {
+            localStorage.setItem("companyId", companyCode);
+          }
           localStorage.setItem("companyName", company.companyName);
           localStorage.setItem("companyEmail", company.email);
           if (subscription) {
             localStorage.setItem("companySubscription", JSON.stringify(subscription));
           }
-          setCompanyId(company._id);
+          setCompanyId(companyCode);
         }
 
         setSuccessMessage("Company registered successfully!");
@@ -440,10 +443,10 @@ export default function OnboardingFlow() {
               Welcome aboard! Start your success journey with TaskFleet!
             </p>
 
-            {/* Company ID Display */}
+            {/* Company Code Display */}
             {companyId && (
               <div className="bg-blue-50 border-2 border-[#20A4F3] rounded-[20px] p-6 mb-8 w-full max-w-md">
-                <p className="text-sm text-gray-600 mb-2 text-center">Your Company ID</p>
+                <p className="text-sm text-gray-600 mb-2 text-center">Your Company Code</p>
                 <div className="flex items-center justify-center gap-3">
                   <p className="text-2xl font-bold text-[#20A4F3] tracking-wider">
                     {companyId}
@@ -453,13 +456,13 @@ export default function OnboardingFlow() {
                       navigator.clipboard.writeText(companyId);
                     }}
                     className="text-[#20A4F3] hover:bg-blue-100 p-2 rounded-lg transition"
-                    title="Copy Company ID"
+                    title="Copy Company Code"
                   >
                     📋
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-3 text-center">
-                  Share this ID with your employees to join your organization
+                  Share this code with your employees to join your organization
                 </p>
               </div>
             )}

@@ -8,6 +8,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [openNoti, setOpenNoti] = useState(false);
   const { role, hasPermission } = useRbac();
+  const roleLabel = role && typeof role === "object" ? role.name || "User" : role || "User";
   const [userData, setUserData] = useState({
     name: "Loading...",
     role: "User",
@@ -24,7 +25,7 @@ const Navbar = () => {
           
           setUserData({
             name: payload.email?.split('@')[0] || "User",
-            role: role || (payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User'),
+            role: roleLabel || (payload.role === 'admin' ? 'Admin' : payload.type === 'company' ? 'Company' : 'User'),
             email: payload.email || ""
           });
         }
@@ -34,7 +35,7 @@ const Navbar = () => {
     };
 
     getUserInfo();
-  }, []);
+  }, [roleLabel]);
 
   return (
     <header className="w-full bg-[#f0f0f0] px-6 py-3 flex items-center justify-between rounded-xl relative">

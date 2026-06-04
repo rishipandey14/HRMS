@@ -19,8 +19,9 @@ const JobDetails = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { job } = location.state || {}
-  const [activeTab, setActiveTab] = useState("description")
-  const [ranking, setRanking] = useState([])
+  const initialTab = location.pathname.includes("/ranking") ? "ranking" : "description"
+  const [activeTab, setActiveTab] = useState(initialTab)
+  const [ranking, setRanking] = useState(() => (Array.isArray(location.state?.ranking) ? location.state.ranking : []))
   const [rankingLoading, setRankingLoading] = useState(false)
   const [rankingError, setRankingError] = useState("")
 
@@ -70,8 +71,19 @@ const JobDetails = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       )
 
-      setRanking(Array.isArray(response.data) ? response.data : [])
-      setActiveTab("applicants")
+      const rankedCandidates = Array.isArray(response.data) ? response.data : []
+      setRanking(rankedCandidates)
+
+      if (location.pathname.includes("/ranking")) {
+        setActiveTab("ranking")
+      } else {
+        navigate(`/jobs/view/ranking`, {
+          state: {
+            job,
+            ranking: rankedCandidates,
+          },
+        })
+      }
     } catch (error) {
       setRankingError(error.response?.data?.error || error.response?.data?.msg || "Failed to rank resumes")
     } finally {
@@ -214,6 +226,16 @@ const JobDetails = () => {
           Responsibilities
         </button>
         <button
+          onClick={() => setActiveTab("ranking")}
+          className={`py-2 font-medium transition-all duration-200 ${
+            activeTab === "ranking"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500 hover:text-blue-500"
+          }`}
+        >
+          Ranked Candidates
+        </button>
+        <button
           onClick={() => setActiveTab("applicants")}
           className={`py-2 font-medium transition-all duration-200 ${
             activeTab === "applicants"
@@ -230,23 +252,6 @@ const JobDetails = () => {
         {rankingError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {rankingError}
-          </div>
-        )}
-
-        {ranking.length > 0 && (
-          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h3 className="mb-3 font-semibold text-blue-900">Ranked Candidates</h3>
-            <div className="space-y-2">
-              {ranking.map((candidate, index) => (
-                <div key={candidate.id} className="flex items-center justify-between rounded-md bg-white px-3 py-2 shadow-sm">
-                  <div>
-                    <div className="font-medium text-gray-800">#{index + 1} {candidate.name}</div>
-                    <div className="text-xs text-gray-500">ID: {candidate.id}</div>
-                  </div>
-                  <div className="text-sm font-semibold text-blue-700">Score: {candidate.score}</div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
@@ -302,6 +307,44 @@ const JobDetails = () => {
               </ul>
             ) : (
               <p className="text-gray-500">No responsibilities listed.</p>
+            )}
+          </div>
+        )}
+
+        {activeTab === "ranking" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Ranked Candidates</h2>
+                <p className="text-sm text-gray-500">Click Rank Resumes to open the ranking page or refresh the latest scores.</p>
+              </div>
+              <button
+                onClick={handleRankResumes}
+                disabled={rankingLoading}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-semibold shadow-md disabled:opacity-60"
+              >
+                {rankingLoading ? "Ranking..." : "Refresh Ranking"}
+              </button>
+            </div>
+
+            {ranking.length > 0 ? (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="space-y-2">
+                  {ranking.map((candidate, index) => (
+                    <div key={candidate.id} className="flex items-center justify-between rounded-md bg-white px-3 py-2 shadow-sm">
+                      <div>
+                        <div className="font-medium text-gray-800">#{index + 1} {candidate.name}</div>
+                        <div className="text-xs text-gray-500">ID: {candidate.id}</div>
+                      </div>
+                      <div className="text-sm font-semibold text-blue-700">Score: {candidate.score}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-gray-600">
+                No ranked candidates yet. Use <span className="font-semibold">Rank Resumes</span> to generate the table.
+              </div>
             )}
           </div>
         )}

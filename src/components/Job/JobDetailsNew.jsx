@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import axios from "axios"
 import { BASE_URL } from "../../utility/Config"
@@ -9,7 +9,6 @@ import {
   Clock,
   Briefcase,
   Building2,
-  Calendar,
   Users,
   CheckCircle2,
   Send,
@@ -19,25 +18,48 @@ import {
 const JobDetails = ({ isPublic = false }) => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { jobId } = useParams()
-  
-  // Get job from location state OR from public share URL
-  let job = location.state?.job || null
-  
-  // If no job and this is public share, show minimal info
-  const isPublicShare = location.pathname.includes("/jobs/share/")
-  
-  const [activeTab, setActiveTab] = useState("description")
-  const [ranking, setRanking] = useState([])
+  const { companyCode, jobId } = useParams()
+
+  const isPublicShare = isPublic || location.pathname.includes("/jobs/share/")
+  const [job, setJob] = useState(location.state?.job || null)
+  const [loading, setLoading] = useState(isPublicShare && !job)
+  const [loadError, setLoadError] = useState("")
+  const initialTab = location.pathname.includes("/ranking") ? "ranking" : "description"
+  const [activeTab, setActiveTab] = useState(initialTab)
+  const [ranking, setRanking] = useState(() => (Array.isArray(location.state?.ranking) ? location.state.ranking : []))
   const [rankingLoading, setRankingLoading] = useState(false)
   const [rankingError, setRankingError] = useState("")
   const [copied, setCopied] = useState(false)
 
-  // If no job data and not public share, redirect back
-  if (!job && !isPublicShare) {
-    navigate("/jobs")
-    return null
-  }
+  const [applyName, setApplyName] = useState("")
+  const [applyEmail, setApplyEmail] = useState("")
+  const [applyPhone, setApplyPhone] = useState("")
+  const [applyCoverLetter, setApplyCoverLetter] = useState("")
+  const [applyFile, setApplyFile] = useState(null)
+  const [applyStatus, setApplyStatus] = useState("")
+  const [applyError, setApplyError] = useState("")
+  const [applying, setApplying] = useState(false)
+  const applyRef = useRef(null)
+  const applicantCount = job?.applicantCount || 0
+
+  useEffect(() => {
+    const fetchPublicJob = async () => {
+      if (!isPublicShare || job) return
+      setLoading(true)
+      setLoadError("")
+
+      try {
+        const response = await axios.get(`${BASE_URL}/public/job/${companyCode}/${jobId}`)
+        setJob(response.data)
+      } catch (error) {
+        setLoadError(error.response?.data?.error || error.message || "Failed to load job details")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPublicJob()
+  }, [companyCode, jobId, isPublicShare, job])
 
   const getJobTypeStyles = (type) => {
     switch (type?.toLowerCase()) {
@@ -68,7 +90,9 @@ const JobDetails = ({ isPublic = false }) => {
   }
 
   const handleShareJob = () => {
-    const shareUrl = `${window.location.origin}/jobs/share/${job?.id || jobId}`
+    if (!job) return
+    const company = job.companyCode || companyCode || ""
+    const shareUrl = `${window.location.origin}/${company}/jobs/${job.id}`
     navigator.clipboard.writeText(shareUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -86,8 +110,19 @@ const JobDetails = ({ isPublic = false }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       )
 
-      setRanking(Array.isArray(response.data) ? response.data : [])
-      setActiveTab("applicants")
+      const rankedCandidates = Array.isArray(response.data) ? response.data : []
+      setRanking(rankedCandidates)
+
+      if (location.pathname.includes("/ranking")) {
+        setActiveTab("ranking")
+      } else {
+        navigate(`/jobs/view/ranking`, {
+          state: {
+            job,
+            ranking: rankedCandidates,
+          },
+        })
+      }
     } catch (error) {
       setRankingError(error.response?.data?.error || error.response?.data?.msg || "Failed to rank resumes")
     } finally {
@@ -95,26 +130,97 @@ const JobDetails = ({ isPublic = false }) => {
     }
   }
 
-  if (!job) {
+  const handleApplyFile = (event) => {
+    setApplyFile(event.target.files?.[0] || null)
+  }
+
+  const scrollToApply = () => {
+    applyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  const handleApply = async (event) => {
+    event.preventDefault()
+    setApplyStatus("")
+    setApplyError("")
+
+    if (!applyFile) {
+      setApplyError("Please upload your resume before applying.")
+      return
+    }
+
+    if (!applyName.trim()) {
+      setApplyError("Please enter your name.")
+      return
+    }
+
+    try {
+      setApplying(true)
+      const formData = new FormData()
+      formData.append("name", applyName)
+      formData.append("email", applyEmail)
+      formData.append("phone", applyPhone)
+      formData.append("coverLetter", applyCoverLetter)
+      formData.append("resume", applyFile)
+
+      const response = await axios.post(
+        `${BASE_URL}/public/job/${companyCode}/${jobId}/apply`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      )
+
+      setApplyStatus("Application submitted successfully. Thank you!")
+      setApplyError("")
+      setApplyName("")
+      setApplyEmail("")
+      setApplyPhone("")
+      setApplyCoverLetter("")
+      setApplyFile(null)
+
+      setJob((prevJob) => prevJob ? {
+        ...prevJob,
+        applicantCount: (prevJob.applicantCount || 0) + 1,
+      } : prevJob)
+    } catch (error) {
+      setApplyError(error.response?.data?.error || error.response?.data?.msg || "Failed to submit application.")
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full min-h-screen bg-gray-100 flex items-center justify-center px-4">
+        <div className="text-center text-gray-700">Loading job details...</div>
+      </div>
+    )
+  }
+
+  if (loadError) {
     return (
       <div className="w-full min-h-screen bg-gray-100 flex items-center justify-center px-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Job Not Found</h1>
-          <p className="text-gray-600 mb-6">The job posting you're looking for is no longer available.</p>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Unable to load job</h1>
+          <p className="text-gray-600 mb-6">{loadError}</p>
           <button
-            onClick={() => navigate("/jobs")}
+            onClick={() => navigate("/")}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            View All Jobs
+            Back to Home
           </button>
         </div>
       </div>
     )
   }
 
+  if (!job && !isPublicShare) {
+    navigate("/jobs")
+    return null
+  }
+
   return (
     <div className="w-full min-h-screen overflow-x-hidden bg-gray-100 px-4 sm:px-6 md:px-10 py-6 space-y-6">
-      {/* Back Button */}
       {!isPublicShare && (
         <button
           onClick={() => navigate("/jobs")}
@@ -125,7 +231,6 @@ const JobDetails = ({ isPublic = false }) => {
         </button>
       )}
 
-      {/* Public Banner */}
       {isPublicShare && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800">
           <p className="font-semibold">📢 Public Job Listing</p>
@@ -133,9 +238,7 @@ const JobDetails = ({ isPublic = false }) => {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between gap-6 bg-white p-6 rounded-xl shadow-sm">
-        {/* Left: Job Title & Details */}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getJobTypeStyles(job.type)}`}>
@@ -145,11 +248,9 @@ const JobDetails = ({ isPublic = false }) => {
               {job.status}
             </span>
           </div>
-          
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-            {job.title}
-          </h1>
-          
+
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">{job.title}</h1>
+
           <div className="flex items-center gap-2 text-gray-600 mb-4">
             <Building2 size={18} />
             <span className="font-semibold">{job.department}</span>
@@ -170,12 +271,11 @@ const JobDetails = ({ isPublic = false }) => {
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Users size={16} className="text-gray-400" />
-              <span>{job.applicantCount} applicants</span>
+              <span>{applicantCount} applicants</span>
             </div>
           </div>
         </div>
 
-        {/* Right: Apply Button & Share */}
         <div className="flex flex-col items-start md:items-end justify-between">
           <div className="flex items-center mb-4">
             {job.applicants && job.applicants.length > 0 && (
@@ -184,9 +284,7 @@ const JobDetails = ({ isPublic = false }) => {
                   <img
                     key={index}
                     src={avatar || `https://i.pravatar.cc/150?img=${index + 1}`}
-                    className={`w-10 h-10 rounded-full border-2 border-white object-cover ${
-                      index !== 0 ? "-ml-3" : ""
-                    }`}
+                    className={`w-10 h-10 rounded-full border-2 border-white object-cover ${index !== 0 ? "-ml-3" : ""}`}
                     alt={`Applicant ${index + 1}`}
                   />
                 ))}
@@ -198,7 +296,7 @@ const JobDetails = ({ isPublic = false }) => {
               </>
             )}
           </div>
-          
+
           <div className="flex flex-wrap gap-3 justify-end">
             {!isPublicShare && (
               <button
@@ -219,14 +317,17 @@ const JobDetails = ({ isPublic = false }) => {
               {copied ? "Copied!" : "Share"}
             </button>
 
-            {job.status === "open" && (
-              <button className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md">
+            {job.status === "open" && isPublicShare && (
+              <button
+                onClick={scrollToApply}
+                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold shadow-md"
+              >
                 <Send size={18} />
                 Apply Now
               </button>
             )}
           </div>
-          
+
           {job.status === "closed" && (
             <div className="px-6 py-3 bg-gray-200 text-gray-600 rounded-lg font-semibold">
               Position Closed
@@ -235,7 +336,88 @@ const JobDetails = ({ isPublic = false }) => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {isPublicShare && job.status === "open" && (
+        <div ref={applyRef} className="bg-white p-6 rounded-xl shadow-sm">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Apply for this role</h2>
+          <p className="text-sm text-gray-500 mb-4">Fill in your details and upload your resume to apply without logging in.</p>
+
+          {applyStatus && (
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+              {applyStatus}
+            </div>
+          )}
+          {applyError && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {applyError}
+            </div>
+          )}
+
+          <form onSubmit={handleApply} className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-1 text-sm text-gray-700">
+              Name
+              <input
+                value={applyName}
+                onChange={(e) => setApplyName(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-800"
+                required
+              />
+            </label>
+
+            <label className="space-y-1 text-sm text-gray-700">
+              Email
+              <input
+                type="email"
+                value={applyEmail}
+                onChange={(e) => setApplyEmail(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-800"
+                placeholder="Optional"
+              />
+            </label>
+
+            <label className="space-y-1 text-sm text-gray-700">
+              Phone
+              <input
+                type="tel"
+                value={applyPhone}
+                onChange={(e) => setApplyPhone(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-800"
+                placeholder="Optional"
+              />
+            </label>
+
+            <label className="space-y-1 text-sm text-gray-700">
+              Resume
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={handleApplyFile}
+                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm text-gray-800"
+                required
+              />
+            </label>
+
+            <label className="md:col-span-2 space-y-1 text-sm text-gray-700">
+              Cover Letter
+              <textarea
+                value={applyCoverLetter}
+                onChange={(e) => setApplyCoverLetter(e.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-800"
+                placeholder="Tell us briefly why you’re a good fit."
+              />
+            </label>
+
+            <button
+              type="submit"
+              disabled={applying}
+              className="md:col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+            >
+              {applying ? "Submitting..." : "Submit Application"}
+            </button>
+          </form>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-6 border-b border-gray-200 px-1 md:px-4 bg-white rounded-t-xl pt-4">
         <button
           onClick={() => setActiveTab("description")}
@@ -267,6 +449,16 @@ const JobDetails = ({ isPublic = false }) => {
         >
           Responsibilities
         </button>
+        <button
+          onClick={() => setActiveTab("ranking")}
+          className={`py-2 font-medium transition-all duration-200 ${
+            activeTab === "ranking"
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500 hover:text-blue-500"
+          }`}
+        >
+          Ranked Candidates
+        </button>
         {!isPublicShare && (
           <button
             onClick={() => setActiveTab("applicants")}
@@ -276,33 +468,15 @@ const JobDetails = ({ isPublic = false }) => {
                 : "text-gray-500 hover:text-blue-500"
             }`}
           >
-            Applicants ({job.applicantCount})
+            Applicants ({applicantCount})
           </button>
         )}
       </div>
 
-      {/* Tab Content */}
       <div className="w-full bg-white p-6 rounded-b-xl shadow-sm">
         {rankingError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {rankingError}
-          </div>
-        )}
-
-        {ranking.length > 0 && (
-          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h3 className="mb-3 font-semibold text-blue-900">Ranked Candidates</h3>
-            <div className="space-y-2">
-              {ranking.map((candidate, index) => (
-                <div key={candidate.id} className="flex items-center justify-between rounded-md bg-white px-3 py-2 shadow-sm">
-                  <div>
-                    <div className="font-medium text-gray-800">#{index + 1} {candidate.name}</div>
-                    <div className="text-xs text-gray-500">ID: {candidate.id}</div>
-                  </div>
-                  <div className="text-sm font-semibold text-blue-700">Score: {candidate.score}</div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
@@ -362,12 +536,50 @@ const JobDetails = ({ isPublic = false }) => {
           </div>
         )}
 
+        {activeTab === "ranking" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Ranked Candidates</h2>
+                <p className="text-sm text-gray-500">Click Rank Resumes to open the ranking page or refresh the latest scores.</p>
+              </div>
+              <button
+                onClick={handleRankResumes}
+                disabled={rankingLoading}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-semibold shadow-md disabled:opacity-60"
+              >
+                {rankingLoading ? "Ranking..." : "Refresh Ranking"}
+              </button>
+            </div>
+
+            {ranking.length > 0 ? (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="space-y-2">
+                  {ranking.map((candidate, index) => (
+                    <div key={candidate.id} className="flex items-center justify-between rounded-md bg-white px-3 py-2 shadow-sm">
+                      <div>
+                        <div className="font-medium text-gray-800">#{index + 1} {candidate.name}</div>
+                        <div className="text-xs text-gray-500">ID: {candidate.id}</div>
+                      </div>
+                      <div className="text-sm font-semibold text-blue-700">Score: {candidate.score}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-gray-600">
+                No ranked candidates yet. Use <span className="font-semibold">Rank Resumes</span> to generate the table.
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === "applicants" && !isPublicShare && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Applicants</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {job.applicants && job.applicants.length > 0 ? (
-                [...Array(Math.min(job.applicantCount, 12))].map((_, index) => (
+                [...Array(Math.min(applicantCount, 12))].map((_, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"

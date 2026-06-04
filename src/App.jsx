@@ -20,7 +20,6 @@ import JobDetailsNew from "./components/Job/JobDetailsNew";
 import ContactPage from "./pages/ContactPage";
 
 import ProjectPage from "./components/Project/ProjectPage";
-import JobDetails from "./components/Job/JobDetails";
 import OrgRolesDivision from "./pages/org_roles_division";
 import Setting from "./pages/Settings";
  
@@ -37,8 +36,8 @@ function App() {
       <Route index element={<Login />} />
       <Route path="/orgsetup" element={<OrgSetup />} />
       <Route path="/org-roles" element={<OrgRolesDivision />} />
-      <Route path="/jobs/share/:jobId" element={<JobDetailsNew isPublic={true} />} />
-      <Route path="/jobs/share/:jobId" element={<JobDetails isPublic={true} />} />
+      <Route path="/:companyCode/jobs/:jobId" element={<JobDetailsNew isPublic={true} />} />
+      <Route path="/jobs/view/ranking" element={<JobDetailsNew />} />
       <Route
         path="/"
         element={

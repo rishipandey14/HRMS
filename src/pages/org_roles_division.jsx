@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { CheckCircle2, User } from "lucide-react"
 
-export default function Plan() {
+export default function Plan({ onPackageSelect } = {}) {
   const [isAnnual, setIsAnnual] = useState(false)
 
   const Role_structure = [
@@ -79,6 +79,15 @@ export default function Plan() {
     },
   ]
 
+  const handleSelectPackage = (role) => {
+    onPackageSelect?.({
+      packageId: role.id,
+      packageName: role.name,
+      billingCycle: isAnnual ? "annual" : "monthly",
+      price: isAnnual ? role.annualPrice : role.monthlyPrice,
+    })
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 transparent-scrollbar">
       <div className="max-w-4xl mx-auto text-center space-y-4">
@@ -121,7 +130,7 @@ export default function Plan() {
           <div key={role.id} className={`relative p-8 rounded-xl shadow-lg flex flex-col ${role.bgColorClass}`}
             style={{ fontFamily: 'Switzer, sans-serif', fontWeight: 400, fontStyle: 'normal', fontSize: '14px', lineHeight: '20px', letterSpacing: '0' }}>
             
-            {plan.isSuggested && (
+            {role.isSuggested && (
               <div className="absolute top-4 right-4 bg-purple-100 text-purple-800 text-xs font-semibold px-3 py-1 rounded-full">
                 #Suggested
               </div>
@@ -131,36 +140,42 @@ export default function Plan() {
               <User className="w-6 h-6" />
             </div>
             
-            <h2 className={`text-2xl font-bold mb-2 ${plan.textColorClass}`}>{plan.name}</h2>
-            <p className="text-sm text-gray-600 mb-4">{plan.description}</p>
+            <h2 className={`text-2xl font-bold mb-2 ${role.textColorClass}`}>{role.name}</h2>
+            <p className="text-sm text-gray-600 mb-4">{role.description}</p>
 
             <div className="flex flex-col items-center sm:flex-row sm:items-baseline mb-6 min-w-0 w-full flex-wrap sm:flex-nowrap">
-              <span className={`text-4xl sm:text-5xl font-extrabold ${plan.textColorClass} flex-shrink`}>
-                ₹{isAnnual ? plan.annualPrice : plan.monthlyPrice}
+              <span className={`text-4xl sm:text-5xl font-extrabold ${role.textColorClass} flex-shrink`}>
+                ₹{isAnnual ? role.annualPrice : role.monthlyPrice}
               </span>
-              {plan.originalMonthlyPrice > 0 && (
+              {role.originalMonthlyPrice > 0 && (
                 <span className="ml-2 text-lg text-gray-500 line-through flex-shrink">
-                  ₹{isAnnual ? plan.originalAnnualPrice : plan.originalMonthlyPrice}
+                  ₹{isAnnual ? role.originalAnnualPrice : role.originalMonthlyPrice}
                 </span>
               )}
               <span className="ml-0 sm:ml-1 text-gray-500 whitespace-nowrap">{isAnnual ? "/ year" : "/ month"}</span>
             </div>
 
-            {plan.isCurrent ? (
-              <button className="w-full bg-black text-white py-3 rounded-md font-semibold hover:bg-gray-800 hover:opacity-90 cursor-pointer transition">
+            {role.isCurrent ? (
+              <button
+                onClick={() => handleSelectPackage(role)}
+                className="w-full bg-black text-white py-3 rounded-md font-semibold hover:bg-gray-800 hover:opacity-90 cursor-pointer transition"
+              >
                 Currently
               </button>
             ) : (
-              <button className="w-full border border-gray-300 text-gray-900 py-3 rounded-md font-semibold hover:bg-gray-100 bg-transparent cursor-pointer transition">
+              <button
+                onClick={() => handleSelectPackage(role)}
+                className="w-full border border-gray-300 text-gray-900 py-3 rounded-md font-semibold hover:bg-gray-100 bg-transparent cursor-pointer transition"
+              >
                 Upgrade
               </button>
             )}
 
             <div className="border-t border-gray-200 mt-6 pt-6">
-              <h3 className={`text-lg font-semibold mb-4 ${plan.textColorClass}`}>Features</h3>
+              <h3 className={`text-lg font-semibold mb-4 ${role.textColorClass}`}>Features</h3>
               <ul className="space-y-3">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className={`flex items-center ${plan.textColorClass}`}>
+                {role.features.map((feature, index) => (
+                  <li key={index} className={`flex items-center ${role.textColorClass}`}>
                     <CheckCircle2 className="w-5 h-5 text-black mr-2 flex-shrink-0" />
                     {feature}
                   </li>
