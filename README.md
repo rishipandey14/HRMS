@@ -1,249 +1,182 @@
-# HRMS Task Management System - Frontend
+# WorkSphere
 
-A comprehensive Human Resource Management System (HRMS) with advanced task tracking, project management, team collaboration, and real-time chat features built with React, Vite, and TailwindCSS.
+WorkSphere is a role-based HRMS and work management platform for teams that need one place to handle projects, tasks, scheduling, chat, leave workflows, regularization, jobs, and system settings.
 
-## 🚀 Features
+This repository contains the public homepage and the authenticated frontend for the WorkSphere product. The frontend connects to the `task-tracker-backend` API and the `resume-ranker` service for hiring workflows.
 
-### Core Functionality
-- **Dashboard**: Real-time overview of tasks, projects, and team activities with interactive charts
-- **Project Management**: Create, manage, and track multiple projects with team assignments
-- **Task Tracking**: Comprehensive task management with status updates, assignments, and deadlines
-- **Task Updates**: Detailed update history for each task with user attribution
-- **Team Management**: View and manage team members, roles, and permissions
-- **Calendar Integration**: FullCalendar-powered scheduling and task visualization
-- **Real-time Chat**: Integrated messaging system with Socket.IO for team communication
-- **Job Postings**: Create and manage job listings
-- **Settings**: User profile management and application configuration
+You can run the full stack locally with npm or use Docker Compose from the workspace root.
 
-### User Experience
-- **Role-Based Access Control**: Admin and regular user roles with appropriate permissions
-- **Responsive Design**: Mobile-first approach with device-specific optimizations
-- **Protected Routes**: Secure authentication and authorization
-- **Task Filtering**: Filter tasks by assignment ("All Tasks" or "Assigned to Me")
-- **Selective Interaction**: Users can only interact with tasks assigned to them
-- **Real-time Updates**: Live notifications and updates via WebSocket connections
+## What the frontend does
 
-## 🛠️ Tech Stack
+The frontend is built with React, Vite, TailwindCSS, React Router, Framer Motion, Lucide icons, Recharts, FullCalendar, and Socket.IO client support.
 
-- **Framework**: React 18.2.0
-- **Build Tool**: Vite 7.0.0
-- **Styling**: TailwindCSS 4.1.11
-- **Routing**: React Router DOM 7.6.3
-- **HTTP Client**: Axios 1.13.2
-- **Calendar**: FullCalendar 6.1.18
-- **Charts**: Recharts 3.0.2
-- **Real-time**: Socket.IO Client 4.8.1
-- **Animations**: Framer Motion 12.23.24
-- **Icons**: Lucide React, React Icons
-- **Linting**: ESLint 9.29.0
+The main areas of the app are:
 
-## 📋 Prerequisites
+- Public homepage and login entry flow.
+- Protected dashboard shell with sidebar and top navigation.
+- Project management views for creating, browsing, and inspecting projects.
+- Task updates and task assignment flows.
+- Team, chat, jobs, calendar, leave, and regularization pages.
+- Settings screens for profile, security, billing, integrations, access control, and account deletion.
+- RBAC-aware route protection so only permitted users can reach sensitive screens.
 
-- Node.js (v16 or higher)
-- npm or yarn
-- Running backend API server (task-tracker-backend)
-- Running chat backend server (chat-app-backend)
+### Frontend structure at a glance
 
-## 🔧 Installation
+- `src/pages/Home.jsx` - public WorkSphere homepage.
+- `src/pages/Login.jsx` - sign in and sign up flow.
+- `src/layout/RootLayout.jsx` - authenticated app shell.
+- `src/layout/Sidebaar.jsx` - main navigation.
+- `src/router/ProtectedRoute.jsx` and `src/router/PermissionRoute.jsx` - access control.
+- `src/utility/Config.js` - API base URL configuration.
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/rishipandey14/HRMS.git
-   cd HRMS
-   ```
+## How the services connect
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+WorkSphere is designed as a three-part system:
 
-3. **Configure environment variables**
-   
-   Create a `.env` file in the root directory (copy from `.env.example`):
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Then update the values:
-   ```env
-   VITE_API_BASE_URL=http://localhost:5000
-   VITE_CHAT_API_BASE_URL=http://localhost:5001
-   ```
-
-   - `VITE_API_BASE_URL`: Task tracker backend API endpoint
-   - `VITE_CHAT_API_BASE_URL`: Chat backend API endpoint
-
-4. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-   The application will be available at `http://localhost:5173`
-
-## 📁 Project Structure
-
-```
-task/
-├── public/                 # Static assets
-├── src/
-│   ├── assets/            # Images, fonts, etc.
-│   ├── components/        # React components
-│   │   ├── Basic/         # Reusable UI components (buttons, forms, etc.)
-│   │   ├── Calender/      # Calendar components
-│   │   ├── Company/       # Organization setup components
-│   │   ├── Job/           # Job posting components
-│   │   ├── Messege/       # Chat/messaging components
-│   │   ├── Nember/        # Team member and task components
-│   │   ├── Project/       # Project-specific components
-│   │   └── Setting/       # Settings components
-│   ├── layout/            # Layout components (Navbar, Sidebar, etc.)
-│   ├── pages/             # Page components (routes)
-│   ├── router/            # Route protection and configuration
-│   ├── utility/           # Helper functions and configurations
-│   ├── App.jsx            # Main application component
-│   ├── index.css          # Global styles
-│   └── main.jsx           # Application entry point
-├── .env.example           # Environment variables template
-├── docker-compose.yml     # Docker composition
-├── Dockerfile             # Docker configuration
-├── eslint.config.js       # ESLint configuration
-├── index.html             # HTML entry point
-├── package.json           # Dependencies and scripts
-├── tailwind.config.js     # TailwindCSS configuration
-└── vite.config.js         # Vite configuration
+```mermaid
+flowchart LR
+	U[User Browser] --> F[WorkSphere Frontend\nVite + React]
+	F --> B[task-tracker-backend\nPort 7000]
+	B --> M[(MySQL)]
+	B --> R[(Redis)]
+	B --> S[resume-ranker\nPort 5000]
+	S --> B
+	B --> F
 ```
 
-## 🔑 Key Components
+### Frontend to backend
 
-### Authentication
-- **Login**: JWT-based authentication
-- **Protected Routes**: Route guards for authenticated users
-- **Organization Setup**: Initial company configuration
+The frontend reads API settings from environment variables in `src/utility/Config.js`.
 
-### Project Management
-- **ProjectPage**: Detailed project view with tasks and team members
-- **CreateProject**: Create new projects with team assignments
-- **Task Component**: Display and manage project tasks
-- **TaskUpdates**: View and add task progress updates
+- `VITE_API_BASE_URL` defaults to `http://127.0.0.1:7000/api`.
+- `VITE_CHAT_API_BASE_URL` defaults to the same base unless overridden.
 
-### Team Collaboration
-- **Team Page**: View all team members
-- **Member Component**: Individual member profiles
-- **Chat Integration**: Real-time team communication
+The frontend calls backend routes such as:
 
-### Dashboard & Analytics
-- **Dashboard**: Overview with task statistics and charts
-- **Calendar**: Visual task scheduling
-- **Charts**: Data visualization with Recharts
+- `/api/auth`
+- `/api/user`
+- `/api/company`
+- `/api/projects`
+- `/api/dashboard`
+- `/api/chats`
+- `/api/messages`
+- `/api/rbac`
+- `/api/holidays`
+- `/api/integrations`
+- `/api/candidates`
+- `/api/jobs`
 
-## 🚦 Available Scripts
+### Backend to resume-ranker
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+The backend is configured to forward resume-related work to the `resume-ranker` service.
 
-## 🔐 Authentication Flow
+- `RESUME_RANKER_UPLOAD_URL` points to the upload endpoint on the resume-ranker service.
+- `RESUME_RANKER_SCORE_URL` points to the scoring endpoint on the resume-ranker service.
+- The resume-ranker service exposes routes for upload, candidates, rank, queue, and score.
 
-1. User logs in with credentials
-2. Backend returns JWT token
-3. Token stored in localStorage
-4. Token included in all API requests via Authorization header
-5. Protected routes verify token validity
+That means WorkSphere can keep the recruiting flow inside the HRMS while the resume parsing and ranking work happens in the dedicated service.
 
-## 🎨 Styling
+## Resume-ranker service
 
-The application uses TailwindCSS with a custom configuration for consistent theming:
-- Responsive breakpoints
-- Custom color palette
-- Utility-first approach
-- Component-level styling
+`resume-ranker` is a separate service in this workspace. It is started from `backend/server.js` inside that folder and exposes:
 
-## 🌐 API Integration
+- `POST /upload`
+- `GET /candidates`
+- `GET /rank`
+- `GET /queue`
+- `GET /score`
 
-The frontend communicates with two backend services:
+The service is used for resume upload, parsing, candidate extraction, and scoring so the main HRMS app can surface hiring data without doing that processing in the frontend.
 
-### Task Tracker Backend (Port 5000)
-- Authentication endpoints
-- Project CRUD operations
-- Task management
-- Team management
-- Dashboard analytics
+## Local development
 
-### Chat Backend (Port 5001)
-- Real-time messaging
-- Socket.IO events
-- Chat history
+### Prerequisites
 
-## 📱 Responsive Design
+- Node.js 18+ recommended
+- npm
+- MySQL 8
+- Redis 7
 
-- Mobile-first approach
-- Breakpoints: sm, md, lg, xl, 2xl
-- Mobile block page for restricted devices
-- Optimized navigation for smaller screens
+### Run with Docker Compose
 
-## 🐳 Docker Support
-
-Build and run using Docker:
+From the workspace root:
 
 ```bash
-docker-compose up
+docker-compose up --build
 ```
 
-Or build manually:
+This starts:
+
+- MySQL on `3307`
+- Redis on `6379`
+- `task-tracker-backend` on `7000`
+- `task` frontend on `5173`
+- `resume-ranker` on `5000`
+
+### Run the frontend with Docker only
+
+If you want only the frontend container, use the frontend Dockerfile from the `task/` folder:
 
 ```bash
-docker build -t hrms-task-frontend .
-docker run -p 5173:5173 hrms-task-frontend
+cd task
+docker build -t worksphere-frontend .
+docker run -p 5173:5173 worksphere-frontend
 ```
 
-## 🔒 Security Features
+### Run the frontend only
 
-- JWT token authentication
-- Role-based access control (Admin/User)
-- Protected API routes
-- Secure credential storage
-- CORS configuration
-- Input validation
+```bash
+cd task
+npm install
+npm run dev
+```
 
-## 🐛 Common Issues & Troubleshooting
+The frontend will run on `http://localhost:5173`.
 
-1. **API Connection Errors**
-   - Verify backend servers are running
-   - Check .env configuration
-   - Ensure correct ports (5000, 5001)
+### Environment variables for the frontend
 
-2. **Authentication Issues**
-   - Clear localStorage
-   - Check token expiration
-   - Verify backend JWT secret
+Create or update `task/.env` with values like:
 
-3. **Real-time Features Not Working**
-   - Check Socket.IO connection
-   - Verify chat backend is running
-   - Check WebSocket support
+```env
+VITE_API_BASE_URL=http://127.0.0.1:7000/api
+VITE_CHAT_API_BASE_URL=http://127.0.0.1:7000
+```
 
-## 🤝 Contributing
+If your chat deployment is separate, point `VITE_CHAT_API_BASE_URL` to that origin instead.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Project notes
 
-## 📄 License
+- The public entry point is the WorkSphere homepage.
+- Authenticated users are redirected into the protected app shell.
+- Dashboard, project, team, and chat modules rely on backend data and permissions.
+- Job and candidate flows depend on the resume-ranker service for document processing and scoring.
+- The app uses role-based access control, so some pages are visible only to permitted users.
 
-This project is part of an HRMS system for internal use.
+## Contributing
 
-## 🔗 Related Projects
+1. Fork the repository or create a feature branch.
+2. Install dependencies in the relevant service folder.
+3. Make focused changes and keep them consistent with the current UI and route structure.
+4. Run the local build or relevant tests before opening a pull request.
+5. Describe the behavior change, impacted screens, and any new environment variables in your PR.
 
-- **[task-tracker-backend](https://github.com/your-username/task-tracker-backend)**: Main API server for task and project management
-- **[chat-app-backend](https://github.com/your-username/chat-app-backend)**: Real-time messaging backend
+### Suggested contribution workflow
 
-## 📞 Support
+```bash
+git checkout -b feature/your-change
+cd task
+npm install
+npm run build
+```
 
-For issues or questions, please open an issue on GitHub or contact the development team.
+If you update backend or resume-ranker behavior, validate the matching service as well.
 
----
+## Related services in this workspace
 
-Built with ❤️ using React + Vite + TailwindCSS
+- `task/` - WorkSphere frontend.
+- `task-tracker-backend/` - main API, auth, RBAC, projects, chat, jobs, and dashboard services.
+- `resume-ranker/` - resume parsing and scoring service for hiring flows.
+
+## License
+
+This project is maintained for internal product work and workflow automation.
