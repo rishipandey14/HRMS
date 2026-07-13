@@ -35,7 +35,7 @@ const ProfileSettings = () => {
             <div>
               <p className="text-xs text-gray-500 mb-1">Email Address</p>
               <div className="flex items-center gap-1">
-                <span className="text-gray-800">tanmay@taskfleet.com</span>
+                <span className="text-gray-800">tanmay@worksphere.com</span>
                 <button className="text-blue-500 text-xs hover:underline">✎</button>
               </div>
             </div>

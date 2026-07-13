@@ -25,7 +25,7 @@ const Integrations = () => {
       {/* Page Header */}
       <h1 className="text-2xl font-semibold text-gray-800 mb-1">Integrations</h1>
       <p className="text-gray-500 mt-1">
-        Connect TaskFleet with your favorite tools and services
+        Connect WorkSphere with your favorite tools and services
       </p>
 
       {/* Featured Integrations */}
