@@ -1,5 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 import RootLayout from "./layout/RootLayout";
+import HomePage from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import Calendar from "./pages/Calendar";
@@ -31,9 +32,8 @@ import RegularizationWindow from "./components/Requlization/requlization_Apply";
 function App() {
   return (
     <Routes>
-      {/* login */}
-      {/* <Route path="/login" element={<Login />} /> */}
-      <Route index element={<Login />} />
+      <Route index element={<HomePage />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/orgsetup" element={<OrgSetup />} />
       <Route path="/org-roles" element={<OrgRolesDivision />} />
       <Route path="/:companyCode/jobs/:jobId" element={<JobDetailsNew isPublic={true} />} />

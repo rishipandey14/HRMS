@@ -58,7 +58,7 @@ const Sidebar = () => {
     >
       {/* Left: Logo */}
       <div className="text-2xl font-semibold text-black">
-        {collapsed ? 'TF' : 'TaskFleet'}
+        {collapsed ? 'WS' : 'WorkSphere'}
       </div>
       {/* Top Section */}
       <div>

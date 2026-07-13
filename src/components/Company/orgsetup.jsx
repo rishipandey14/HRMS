@@ -440,7 +440,7 @@ export default function OnboardingFlow() {
             </h2>
 
             <p className="text-gray-500 text-center max-w-lg mb-6">
-              Welcome aboard! Start your success journey with TaskFleet!
+              Welcome aboard! Start your success journey with WorkSphere!
             </p>
 
             {/* Company Code Display */}

@@ -129,7 +129,7 @@ const Login = () => {
           {/* Top Content */}
           <div className="flex flex-col items-center justify-center pt-6 text-center">
             <div className="text-white text-5xl md:text-5xl font-bold leading-tight">
-              WELCOME TO TASKFLEET
+              WELCOME TO WORKSPHERE
             </div>
             <div className="text-white text-base md:text-2xl pt-2">
               Your Gateway to Effortless Management
@@ -160,7 +160,7 @@ const Login = () => {
           <div className="w-full max-w-sm">
             {/* Logo */}
             <h1 className="text-[#26203B] text-2xl font-bold mb-6">
-              TaskFleet
+              WorkSphere
             </h1>
 
             {/* Tab Switcher */}
@@ -345,7 +345,7 @@ const Login = () => {
           <div className="w-full max-w-sm">
             {/* Top Section: Shared */}
             <h1 className="text-[#26203B] text-2xl font-bold mb-6">
-              TaskFleet
+              WorkSphere
             </h1>
             <div className="flex mb-6 rounded-xl p-1 bg-gray-200">
               <button
